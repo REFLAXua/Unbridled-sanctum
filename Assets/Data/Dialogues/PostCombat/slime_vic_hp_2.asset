@@ -1,0 +1,41 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b6d7d8818b065a048a22fcf1221d9a15, type: 3}
+  m_Name: slime_vic_hp_2
+  m_EditorClassIdentifier: 
+  sequenceId: slime_vic_hp_2
+  enemyType: 0
+  requiredCombatPhase: 2
+  lines:
+  - speaker: 1
+    speakerName: Slime Girl
+    text: Aahnn... beaten down while burning from inside... every drop of my core
+      is trembling...
+    playerExpression: Normal
+    enemyEmotion: lust_joy
+  - speaker: 0
+    speakerName: You
+    text: You pushed yourself to exhaustion. Can you even hold your shape anymore?
+    playerExpression: Smile
+    enemyEmotion: lust_joy
+  - speaker: 1
+    speakerName: Slime Girl
+    text: M-My slime is so warm... if you touch me again right now, I'll melt into
+      sweet syrup...
+    playerExpression: Normal
+    enemyEmotion: lust_suprised
+  - speaker: 2
+    speakerName: Narrator
+    text: The dazed Slime Girl puddles helplessly at your boots, completely drained
+      of fighting will.
+    playerExpression: Smug
+    enemyEmotion: lust_suprised

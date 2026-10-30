@@ -1,0 +1,40 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b6d7d8818b065a048a22fcf1221d9a15, type: 3}
+  m_Name: slime_vic_sed
+  m_EditorClassIdentifier: 
+  sequenceId: slime_vic_sed
+  enemyType: 0
+  requiredCombatPhase: 2
+  lines:
+  - speaker: 0
+    speakerName: You
+    text: Look at you... completely pliant and trembling under my gentle touch.
+    playerExpression: Smug
+    enemyEmotion: lust_joy
+  - speaker: 1
+    speakerName: Slime Girl
+    text: Aahh~! Y-You stroked my sensitive core membrane! I-I can't maintain my
+      form...
+    playerExpression: Blush
+    enemyEmotion: lust_joy
+  - speaker: 0
+    speakerName: You
+    text: Will you yield the way peacefully now, sweet puddle?
+    playerExpression: Smile
+    enemyEmotion: lust_joy
+  - speaker: 1
+    speakerName: Slime Girl
+    text: Y-Yes! Take whatever treasure you want! Just... don't tease my core anymore
+      today~!
+    playerExpression: Lustful
+    enemyEmotion: lust_suprised

@@ -1,0 +1,53 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b6d7d8818b065a048a22fcf1221d9a15, type: 3}
+  m_Name: event_stele
+  m_EditorClassIdentifier: 
+  sequenceId: event_stele
+  enemyType: 1
+  requiredCombatPhase: 0
+  lines:
+  - speaker: 2
+    speakerName: Ancient Stele
+    text: An ancient basalt monolith looms before you, pulsating with crimson demonic
+      inscriptions of a forgotten age.
+    playerExpression: Normal
+    enemyEmotion: smile
+  - speaker: 1
+    speakerName: Abyssal Echo
+    text: Mmm... drawn to forbidden knowledge, little moth? The sigils etched here
+      whisper of boundless power and carnal secrets.
+    playerExpression: Shocked
+    enemyEmotion: smile
+  - speaker: 0
+    speakerName: You
+    text: Who's there?! An apparition? The whispers... they resonate directly inside
+      my mind.
+    playerExpression: Shocked
+    enemyEmotion: smile
+  - speaker: 1
+    speakerName: Abyssal Echo
+    text: Just an echo of desire left behind in stone. Dare you trace the glyph with
+      your bare finger?
+    playerExpression: Smile
+    enemyEmotion: grin
+  - speaker: 0
+    speakerName: You
+    text: I will decipher your arcane secrets without succumbing to your deceit.
+    playerExpression: Smug
+    enemyEmotion: annoyed
+  - speaker: 2
+    speakerName: Ancient Stele
+    text: Deciphering the cryptic demonic runes granted you deep arcane focus and
+      insight (+35 Gold, Mana replenished).
+    playerExpression: Normal
+    enemyEmotion: grin

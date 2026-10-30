@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 293699f3bf6206741b81c49a863be7b6, type: 3}
+  m_Name: heavy_slash
+  m_EditorClassIdentifier: 
+  id: heavy_slash
+  cardName: Heavy Slash
+  cardArt: {fileID: 0}
+  apCost: 2
+  cooldownTurns: 2
+  hpDamage: 16
+  shieldGain: 0
+  seductionAmount: 0
+  clothesRepair: 0
+  target: 0
+  description: A crushing overhead blow dealing 16 heavy damage.

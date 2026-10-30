@@ -1,0 +1,42 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 17741361add7f66ce0d55047b9f16420, type: 3}
+  m_Name: EnemySpriteDatabase
+  m_EditorClassIdentifier: 
+  slimeGirl:
+    enemyType: 0
+    phase0: {fileID: 21300000, guid: 8e4a91921b582ae25824d251ce71c099, type: 3}
+    phase1: {fileID: 21300000, guid: 081cfdb7d6addb9b9877855ad53ca376, type: 3}
+    phase2: {fileID: 21300000, guid: 4235aa6d4fc013770f86bad7a76654e2, type: 3}
+    smile: {fileID: 21300000, guid: f129aa028ecbaec6994c91b641e00eca, type: 3}
+    grin: {fileID: 21300000, guid: aef23302c480bc98a27a3e6e70e02f11, type: 3}
+    annoyed: {fileID: 21300000, guid: ffa257da52a93b7a3f9a3989d8dc47ef, type: 3}
+    suprised: {fileID: 21300000, guid: e619872e2dd6f11b89d96bf45899d9f5, type: 3}
+    lustful: {fileID: 21300000, guid: e8eb75045abe973aa1718a0c888c3e23, type: 3}
+    lustJoy: {fileID: 21300000, guid: bb1c49edfb8a8bca63af0a2f7c900d2b, type: 3}
+    lustSuprised: {fileID: 21300000, guid: e619872e2dd6f11b89d96bf45899d9f5, type: 3}
+    lustIntence: {fileID: 0}
+    lustEstasy: {fileID: 0}
+  succubus:
+    enemyType: 1
+    phase0: {fileID: 21300000, guid: 2e9f8e009d3f3f8d9d051c0c67e05b84, type: 3}
+    phase1: {fileID: 21300000, guid: c31239aa62f23221c81698dfe5dfb642, type: 3}
+    phase2: {fileID: 21300000, guid: 53dc7975a859902e7c650baca680964c, type: 3}
+    smile: {fileID: 21300000, guid: 43b9969784fe08d5e7f7c40a03c18567, type: 3}
+    grin: {fileID: 21300000, guid: 7c689c4722b233cefaf868c928885221, type: 3}
+    annoyed: {fileID: 21300000, guid: 1e693e6f9f2c6d67a9a8829afb81837a, type: 3}
+    suprised: {fileID: 21300000, guid: c4a8dc3a3a1602f44b2ad40cc6ea4433, type: 3}
+    lustful: {fileID: 0}
+    lustJoy: {fileID: 21300000, guid: a0d63142f8dfda856b9e3e8bdb6a442c, type: 3}
+    lustSuprised: {fileID: 0}
+    lustIntence: {fileID: 21300000, guid: 26e0199586c803faa4da96db040002f6, type: 3}
+    lustEstasy: {fileID: 21300000, guid: 9fa36c1aa1a854efe8573065029832f4, type: 3}

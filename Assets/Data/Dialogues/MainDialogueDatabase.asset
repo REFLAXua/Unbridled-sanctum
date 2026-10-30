@@ -1,0 +1,48 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 386e795dcd5a7c74cadb29b4b4f24cbb, type: 3}
+  m_Name: MainDialogueDatabase
+  m_EditorClassIdentifier: 
+  postCombatDialogues:
+  - enemyType: 0
+    resultType: 0
+    phase: 0
+    sequence: {fileID: 11400000, guid: bf2e322fadd1c6047a545953c8e24439, type: 2}
+  - enemyType: 0
+    resultType: 0
+    phase: 1
+    sequence: {fileID: 11400000, guid: bf2e322fadd1c6047a545953c8e24439, type: 2}
+  - enemyType: 0
+    resultType: 0
+    phase: 2
+    sequence: {fileID: 11400000, guid: 36be2b86d1cf87d438078da97bcf26ec, type: 2}
+  - enemyType: 0
+    resultType: 1
+    phase: 2
+    sequence: {fileID: 11400000, guid: 860c45bfea81c824793350cc8c6a2f6c, type: 2}
+  - enemyType: 1
+    resultType: 0
+    phase: 0
+    sequence: {fileID: 11400000, guid: 82c933558593b904eb86fc88b65aa225, type: 2}
+  - enemyType: 1
+    resultType: 0
+    phase: 1
+    sequence: {fileID: 11400000, guid: 82c933558593b904eb86fc88b65aa225, type: 2}
+  - enemyType: 1
+    resultType: 1
+    phase: 2
+    sequence: {fileID: 11400000, guid: 7fa547fe2f6d50c4ba5764fc052bb615, type: 2}
+  eventDialogues:
+  - eventId: Underground Spring
+    sequence: {fileID: 11400000, guid: f1b371f4981f9404c8fb5c3476409bef, type: 2}
+  - eventId: Ancient Stele
+    sequence: {fileID: 11400000, guid: 4dd0f1fdecceece44ac1e0c76a330f42, type: 2}

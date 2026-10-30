@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f6f82dcc078ea234cae0e807ecb715b8, type: 3}
+  m_Name: Succubus_SensualKiss
+  m_EditorClassIdentifier: 
+  skillName: Sensual Kiss
+  intentIcon: {fileID: 0}
+  manaCost: 8
+  manaGain: 0
+  hpDamage: 0
+  clothesDamage: 0
+  seductionDamage: 40
+  shieldGain: 0
+  description: Blows a magical aphrodisiac kiss that sets the player's heart racing.
