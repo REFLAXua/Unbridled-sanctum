@@ -28,11 +28,15 @@ namespace UnbridledSanctum.Combat
         public int defeatedHpEnemiesCount;
         public bool isPureSeduction => totalEnemies > 0 && seducedEnemiesCount == totalEnemies;
         public bool isHybrid => seducedEnemiesCount > 0 && defeatedHpEnemiesCount > 0;
+        public bool isPureMartialRun; // True if won with zero lust cards played and zero monster seed absorbed
     }
 
     public class CombatManager : MonoBehaviour
     {
         public static CombatManager Instance { get; private set; }
+
+        public bool isPureRunActive = true;
+        public event Action<bool> OnPureStatusChanged;
 
         public Combatant player { get; private set; }
         public List<Combatant> enemies { get; private set; } = new List<Combatant>();
@@ -211,6 +215,8 @@ namespace UnbridledSanctum.Combat
                 unlockedCards.Add(new CardData("shield_bash", "Shield Bash", ap: 1, cd: 2, dmg: 5, shield: 4, seduction: 0, CardTarget.SingleEnemy, "Slam opponent with shield rim: deals 5 damage, 12 Stamina posture damage, and gives 4 Shield.", CardCategory.WarriorTactics, LustPathType.None, StanceRequirement.NeutralOnly, staminaDmg: 12));
                 unlockedCards.Add(new CardData("iron_fortress", "Iron Fortress", ap: 2, cd: 2, dmg: 0, shield: 15, seduction: 0, CardTarget.Self, "Assume an unyielding defensive stance, gaining 15 Shield.", CardCategory.WarriorTactics, LustPathType.None, StanceRequirement.Any));
                 unlockedCards.Add(new CardData("mend_clothes", "Quick Patch", ap: 1, cd: 2, dmg: 0, shield: 0, seduction: 0, CardTarget.Self, "Swiftly adjust and bind garments, restoring 15 clothes durability.", CardCategory.WarriorTactics, LustPathType.None, StanceRequirement.Any));
+                unlockedCards.Add(new CardData("cold_focus", "Cold Focus", ap: 1, cd: 2, dmg: 0, shield: 6, seduction: 0, CardTarget.Self, "Focus mind with iron discipline, reducing internal Arousal by 25% and gaining 6 Shield.", CardCategory.WarriorTactics, LustPathType.None, StanceRequirement.Any, arousalSelf: -25));
+                unlockedCards.Add(new CardData("disengage_kick", "Disengage Kick", ap: 1, cd: 1, dmg: 5, shield: 0, seduction: 0, CardTarget.SingleEnemy, "Deliver a swift push kick to drive back advancing foes. Deals 5 HP damage, 15 Stamina posture damage, and breaks physical holds.", CardCategory.WarriorTactics, LustPathType.None, StanceRequirement.Any, staminaDmg: 15));
 
                 // Path 1: Phallus Devotee (Lust Instincts - 9 Cards)
                 unlockedCards.Add(new CardData("breath_of_ecstasy", "Breath of Ecstasy", ap: 0, cd: 1, dmg: 0, shield: 0, seduction: 0, CardTarget.Self, "Exhale softly to cool burning blood, reducing self Arousal by 15% and steadying your mind.", CardCategory.LustInstinct, LustPathType.PhallusDevotee, StanceRequirement.Any, arousalSelf: -15, ephemeral: true));
@@ -499,11 +505,37 @@ namespace UnbridledSanctum.Combat
 
             playerDeck.Clear();
 
-            // Dynamic base warrior/struggle slots (4 at Stage 0-1, 3 at Stage 2)
+            // Dynamic base warrior/struggle slots and lust instinct slots (GDD Section 5)
+            // Tier 1: 0% - 30% Arousal -> 4 warrior/struggle, 0 lust instincts
+            // Tier 2: 31% - 60% Arousal -> 4 warrior/struggle, 1 lust instinct
+            // Tier 3: 61% - 85% Arousal -> 3 warrior/struggle, 2 lust instincts (instincts cost -1 AP)
+            // Tier 4: 86% - 100% Arousal -> 2 warrior/struggle, 3 lust instincts (weapon attacks cost +1 AP)
             int baseActionSlots = 4;
+            int lustCardCount = 0;
+
             if (player != null)
             {
-                if (player.seductionStacks >= 2) baseActionSlots = 3;
+                int curArousal = player.arousal;
+                if (curArousal >= 86 || player.seductionStacks >= 3)
+                {
+                    baseActionSlots = 2;
+                    lustCardCount = 3;
+                }
+                else if (curArousal >= 61 || player.seductionStacks == 2)
+                {
+                    baseActionSlots = 3;
+                    lustCardCount = 2;
+                }
+                else if (curArousal >= 31 || player.seductionStacks == 1)
+                {
+                    baseActionSlots = 4;
+                    lustCardCount = 1;
+                }
+                else
+                {
+                    baseActionSlots = 4;
+                    lustCardCount = 0;
+                }
             }
 
             // 1. Stance Swap: In struggle/grapple/penetration, weapon strikes are replaced by Struggle Actions
@@ -544,42 +576,30 @@ namespace UnbridledSanctum.Combat
                 }
             }
 
-            // 3. Dynamic Ephemeral Lust Cards based on Lust Stages (0, 1, 2)
-            // Stage 0: 0 lust cards
-            // Stage 1: +1 lust card
-            // Stage 2: +2 lust cards (lust instincts cost -1 AP, min 0)
-            // Stage 3: Climax Defeat (combat ends)
-            if (activeLustPath != LustPathType.None && player != null)
+            // 3. Dynamic Ephemeral Lust Cards from Chosen Path
+            if (activeLustPath != LustPathType.None && player != null && lustCardCount > 0)
             {
-                int lustCardCount = 0;
-                if (player.seductionStacks >= 2) lustCardCount = 2;
-                else if (player.seductionStacks == 1) lustCardCount = 1;
-
-                if (lustCardCount > 0)
+                List<CardData> selectedLustCards = GetSmartContextLustCards(activeLustPath, lustCardCount);
+                for (int i = 0; i < selectedLustCards.Count; i++)
                 {
-                    List<CardData> selectedLustCards = GetSmartContextLustCards(activeLustPath, lustCardCount);
-                    for (int i = 0; i < selectedLustCards.Count; i++)
+                    CardData baseCard = selectedLustCards[i];
+                    CardData ephemeralCard = baseCard.Clone();
+                    ephemeralCard.isEphemeral = true;
+
+                    // At Tier 3+ (Arousal >= 61% or seductionStacks >= 2): Lust instinct cards cost -1 AP (min 0)!
+                    if (player.arousal >= 61 || player.seductionStacks >= 2)
                     {
-                        CardData baseCard = selectedLustCards[i];
-                        CardData ephemeralCard = baseCard.Clone();
-                        ephemeralCard.isEphemeral = true;
-
-                        // At Stage 2 (seductionStacks >= 2): Lust instinct cards cost -1 AP!
-                        if (player.seductionStacks >= 2)
-                        {
-                            ephemeralCard.apCost = Mathf.Max(0, ephemeralCard.apCost - 1);
-                        }
-
-                        CardInstance inst = new CardInstance(ephemeralCard);
-                        inst.currentCooldown = cardCooldowns.TryGetValue(inst.data.id, out int cd) ? cd : 0;
-                        playerDeck.Add(inst);
+                        ephemeralCard.apCost = Mathf.Max(0, ephemeralCard.apCost - 1);
                     }
+
+                    CardInstance inst = new CardInstance(ephemeralCard);
+                    inst.currentCooldown = cardCooldowns.TryGetValue(inst.data.id, out int cd) ? cd : 0;
+                    playerDeck.Add(inst);
                 }
             }
 
-            // High Arousal penalty: At Stage 2 (seductionStacks >= 2), physical weapon attacks cost +1 AP for this turn's hand
-            // (Modifies cloned CardData instance safely, preserving persistent template)
-            if (player != null && player.seductionStacks >= 2)
+            // High Arousal penalty: Above 85% Arousal (Tier 4), the body trembles from feverish ecstasy: physical attacks cost +1 AP
+            if (player != null && (player.arousal >= 86 || player.seductionStacks >= 2))
             {
                 foreach (var c in playerDeck)
                 {
@@ -867,6 +887,8 @@ namespace UnbridledSanctum.Combat
             StopAllCoroutines();
             isActionInProgress = false;
             activeControlZone = ExternalFinishZone.None;
+            isPureRunActive = true;
+            OnPureStatusChanged?.Invoke(isPureRunActive);
 
             if (enemyGroup.Count > 3)
             {
@@ -1048,6 +1070,17 @@ namespace UnbridledSanctum.Combat
         private IEnumerator ExecutePlayerCardRoutine(CardInstance card, Combatant targetEnemy)
         {
             isActionInProgress = true;
+
+            // Pure Run check: Playing any Lust Instinct card compromises pure martial status
+            if (card.data.category == CardCategory.LustInstinct)
+            {
+                if (isPureRunActive)
+                {
+                    isPureRunActive = false;
+                    OnCombatLogMessage?.Invoke("<color=#FF6688><b>[PURE COMPROMISED]</b></color> You gave in to the Vessel's lust instincts!");
+                    OnPureStatusChanged?.Invoke(false);
+                }
+            }
 
             // 1. Deduct AP & apply CD immediately
             player.currentAp -= card.data.apCost;
@@ -1420,6 +1453,12 @@ namespace UnbridledSanctum.Combat
             }
             else if (isPenetrating)
             {
+                if (isPureRunActive)
+                {
+                    isPureRunActive = false;
+                    OnCombatLogMessage?.Invoke("<color=#FF4466><b>[PURE COMPROMISED]</b></color> The Vessel was defiled by internal monster seed!");
+                    OnPureStatusChanged?.Invoke(false);
+                }
                 player.AddSemen(pranaAmount);
                 persistentSemenVolumeMl += pranaAmount;
                 FleshTransformationManager.Instance?.AddPrana(pranaAmount, enemy?.name, isInternal: true);
@@ -2270,6 +2309,15 @@ namespace UnbridledSanctum.Combat
                     result.lumieresEarned = 25 * enemies.Count;
                     result.lustidEarned = 10;
                     OnCombatLogMessage?.Invoke($"[MARTIAL VICTORY] All {enemies.Count} opponents exhausted and retreated! Earned {result.lumieresEarned} Lumieres and {result.lustidEarned} Lustid!");
+
+                    if (isPureRunActive)
+                    {
+                        result.isPureMartialRun = true;
+                        int totalPureWins = PlayerPrefs.GetInt("Sanctum_PureCombatWins", 0) + 1;
+                        PlayerPrefs.SetInt("Sanctum_PureCombatWins", totalPureWins);
+                        PlayerPrefs.Save();
+                        OnCombatLogMessage?.Invoke($"<color=#55EEFF><b>[UNTAINTED VICTORY]</b></color> Pure Run intact! ({totalPureWins} pure encounters won). Zero lust cards played, zero monster seed absorbed.");
+                    }
                 }
 
                 if (result.lustidEarned > 0)

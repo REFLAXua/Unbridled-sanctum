@@ -2288,7 +2288,8 @@ namespace UnbridledSanctum.UI
                 string stanceStr = manager != null ? $"[{manager.currentStance.ToString().ToUpper()}]" : "[NEUTRAL]";
                 string cumStr = (p.semenVolumeMl > 0) ? $" [Cum: {p.semenVolumeMl}ml]" : "";
                 string flusterStr = p.isFlustered ? " [Flustered]" : "";
-                playerStatusText.text = $"{stanceStr}{flusterStr}{cumStr}";
+                string pureStr = (manager != null && manager.isPureRunActive) ? " <color=#55EEFF>[PURE]</color>" : " <color=#778899>[TAINTED]</color>";
+                playerStatusText.text = $"{stanceStr}{flusterStr}{cumStr}{pureStr}";
                 playerStatusText.color = (manager != null && manager.currentStance != CombatStance.Neutral) 
                     ? new Color(1f, 0.45f, 0.80f, 1f) 
                     : (p.isFlustered ? new Color(1f, 0.55f, 0.75f, 1f) : new Color(0.7f, 0.8f, 0.9f, 0.8f));
