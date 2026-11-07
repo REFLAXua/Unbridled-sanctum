@@ -244,9 +244,17 @@ public class LobbyUI : MonoBehaviour
                 {
                     if (FleshTransformationManager.Instance != null)
                     {
+                        if (FleshTransformationManager.Instance.characterState == null && characterState != null)
+                        {
+                            FleshTransformationManager.Instance.Initialize(characterState);
+                        }
                         FleshTransformationManager.Instance.StabilizeBodySize((BodySizeType)sizeIdx);
-                        RefreshWardrobe();
                     }
+                    if (characterState != null)
+                    {
+                        characterState.CurrentBodySize = (BodySizeType)sizeIdx;
+                    }
+                    RefreshWardrobe();
                 });
             }
         }
@@ -1024,45 +1032,45 @@ public class LobbyUI : MonoBehaviour
         }
 
         // Flesh Stabilization & Archive
-        if (FleshTransformationManager.Instance != null)
+        FleshTransformationManager ftm = FleshTransformationManager.Instance;
+        if (bodySizeButtons != null)
         {
-            FleshTransformationManager ftm = FleshTransformationManager.Instance;
-            if (bodySizeButtons != null)
+            string[] sizeLabels = { "Small (A-B)", "Medium (C-D)", "Large (D-E)", "XLarge (E-F)" };
+            for (int i = 0; i < bodySizeButtons.Length; i++)
             {
-                string[] sizeLabels = { "Small (A-B)", "Medium (C-D)", "Large (D-E)", "XLarge (E-F)" };
-                for (int i = 0; i < bodySizeButtons.Length; i++)
+                BodySizeType size = (BodySizeType)i;
+                bool unlocked = ftm != null ? ftm.IsSizeUnlocked(size) : true;
+                bool active = characterState != null && characterState.CurrentBodySize == size;
+
+                if (bodySizeButtons[i] != null)
                 {
-                    BodySizeType size = (BodySizeType)i;
-                    bool unlocked = ftm.IsSizeUnlocked(size);
-                    bool active = characterState.CurrentBodySize == size;
+                    bodySizeButtons[i].interactable = unlocked;
+                }
 
-                    if (bodySizeButtons[i] != null)
-                    {
-                        bodySizeButtons[i].interactable = unlocked;
-                    }
+                if (bodySizeButtonBgs != null && i < bodySizeButtonBgs.Length && bodySizeButtonBgs[i] != null)
+                {
+                    if (active)
+                        bodySizeButtonBgs[i].color = new Color(0.75f, 0.25f, 0.65f, 1f);
+                    else if (unlocked)
+                        bodySizeButtonBgs[i].color = new Color(0.18f, 0.22f, 0.30f, 0.90f);
+                    else
+                        bodySizeButtonBgs[i].color = new Color(0.10f, 0.12f, 0.16f, 0.50f);
+                }
 
-                    if (bodySizeButtonBgs != null && i < bodySizeButtonBgs.Length && bodySizeButtonBgs[i] != null)
-                    {
-                        if (active)
-                            bodySizeButtonBgs[i].color = new Color(0.75f, 0.25f, 0.65f, 1f);
-                        else if (unlocked)
-                            bodySizeButtonBgs[i].color = new Color(0.18f, 0.22f, 0.30f, 0.90f);
-                        else
-                            bodySizeButtonBgs[i].color = new Color(0.10f, 0.12f, 0.16f, 0.50f);
-                    }
-
-                    if (bodySizeButtonTexts != null && i < bodySizeButtonTexts.Length && bodySizeButtonTexts[i] != null)
-                    {
-                        if (active)
-                            bodySizeButtonTexts[i].text = $"[ACTIVE] {sizeLabels[i]}";
-                        else if (unlocked)
-                            bodySizeButtonTexts[i].text = sizeLabels[i];
-                        else
-                            bodySizeButtonTexts[i].text = $"[LOCKED] {sizeLabels[i]}";
-                    }
+                if (bodySizeButtonTexts != null && i < bodySizeButtonTexts.Length && bodySizeButtonTexts[i] != null)
+                {
+                    if (active)
+                        bodySizeButtonTexts[i].text = $"[ACTIVE] {sizeLabels[i]}";
+                    else if (unlocked)
+                        bodySizeButtonTexts[i].text = sizeLabels[i];
+                    else
+                        bodySizeButtonTexts[i].text = $"[LOCKED] {sizeLabels[i]}";
                 }
             }
+        }
 
+        if (ftm != null)
+        {
             if (fleshPranaGaugeText != null)
             {
                 string status = ftm.IsTransformationPending ? "<color=#FF77DD>[TRANSFORMATION PRIMED]</color>" : "";

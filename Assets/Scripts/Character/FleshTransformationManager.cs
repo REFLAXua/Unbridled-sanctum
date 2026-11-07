@@ -17,6 +17,10 @@ public class FleshTransformationManager : MonoBehaviour
     [Header("Configuration")]
     public int thresholdMl = 200;
 
+    [Header("Dev / Testing Mode")]
+    [Tooltip("If true, all body sizes are unlocked in wardrobe for testing.")]
+    public bool unlockAllSizesInWardrobe = true;
+
     [Header("State")]
     [SerializeField] private int _currentPranaMl = 0;
     public int currentPranaMl => _currentPranaMl;
@@ -172,7 +176,7 @@ public class FleshTransformationManager : MonoBehaviour
     /// </summary>
     public bool StabilizeBodySize(BodySizeType targetSize)
     {
-        if ((int)targetSize > (int)maxUnlockedBodySize) return false;
+        if (!unlockAllSizesInWardrobe && (int)targetSize > (int)maxUnlockedBodySize) return false;
         if (characterState == null) return false;
 
         characterState.CurrentBodySize = targetSize;
@@ -181,6 +185,7 @@ public class FleshTransformationManager : MonoBehaviour
 
     public bool IsSizeUnlocked(BodySizeType size)
     {
+        if (unlockAllSizesInWardrobe) return true;
         return (int)size <= (int)maxUnlockedBodySize;
     }
 

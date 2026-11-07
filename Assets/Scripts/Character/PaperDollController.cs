@@ -82,6 +82,13 @@ public class PaperDollController : MonoBehaviour
         if (hairFrontImage != null) ClearImage(hairFrontImage);
         if (blushImage != null) ClearImage(blushImage);
 
+#if UNITY_EDITOR
+        if (breastSprites == null || breastSprites.Length == 0)
+        {
+            AutoAssignBreastSprites();
+        }
+#endif
+
         RefreshBody();
     }
 
@@ -198,7 +205,21 @@ public class PaperDollController : MonoBehaviour
         RefreshEquipment(); // clothes sprite also depends on body size
     }
 
-    public bool HasModularBreastSprites => breastSprites != null && breastSprites.Length > 0;
+    public bool HasModularBreastSprites
+    {
+        get
+        {
+            if (breastSprites != null && breastSprites.Length > 0) return true;
+#if UNITY_EDITOR
+            if (System.IO.File.Exists("Assets/sprites/doll/Breast_medium.png"))
+            {
+                AutoAssignBreastSprites();
+                return breastSprites != null && breastSprites.Length > 0;
+            }
+#endif
+            return false;
+        }
+    }
 
     /// <summary>Switches the base body sprite to match current body size, or uses hero_small if modular breasts are configured.</summary>
     public void RefreshBody()
