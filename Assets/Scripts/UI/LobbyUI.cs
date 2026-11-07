@@ -58,6 +58,13 @@ public class LobbyUI : MonoBehaviour
     public TextMeshProUGUI fleshPranaGaugeText;
     public Button fleshDebugFillBtn;
 
+    [Header("Emotion Test Elements")]
+    public GameObject emotionContainer;
+    public Button[] emotionButtons;
+    public Image[] emotionButtonBgs;
+    public TextMeshProUGUI[] emotionButtonTexts;
+    private static readonly string[] emotionNames = { "Normal", "smile", "Angry", "Annoyed", "shocked", "Pain", "O" };
+
     [Header("Deck Page Elements")]
     public TextMeshProUGUI deckCountText;
     public Transform activeDeckContainer;
@@ -270,6 +277,22 @@ public class LobbyUI : MonoBehaviour
                     RefreshWardrobe();
                 }
             });
+        }
+
+        if (emotionButtons != null)
+        {
+            for (int i = 0; i < emotionButtons.Length; i++)
+            {
+                int emoIdx = i;
+                emotionButtons[i].onClick.RemoveAllListeners();
+                emotionButtons[i].onClick.AddListener(() =>
+                {
+                    if (emoIdx < emotionNames.Length)
+                    {
+                        SelectEmotion(emotionNames[emoIdx]);
+                    }
+                });
+            }
         }
 
         if (pathsTabBtn != null)
@@ -986,6 +1009,45 @@ public class LobbyUI : MonoBehaviour
         }
     }
 
+    public void SelectEmotion(string emotionName)
+    {
+        Sprite spr = null;
+        if (characterState != null && characterState.appearanceDatabase != null && characterState.appearanceDatabase.emotionStyles != null)
+        {
+            foreach (var s in characterState.appearanceDatabase.emotionStyles)
+            {
+                if (s != null && s.name.Equals(emotionName, StringComparison.OrdinalIgnoreCase))
+                {
+                    spr = s;
+                    break;
+                }
+            }
+        }
+
+#if UNITY_EDITOR
+        if (spr == null)
+        {
+            spr = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>($"Assets/sprites/Expression/Emotions/{emotionName}.png");
+        }
+#endif
+
+        if (spr != null)
+        {
+            if (characterState != null)
+            {
+                characterState.SetExpression(spr);
+            }
+            PaperDollController pd = FindFirstObjectByType<PaperDollController>();
+            if (pd != null && pd.expressionImage != null)
+            {
+                pd.expressionImage.sprite = spr;
+                pd.expressionImage.enabled = true;
+            }
+        }
+
+        RefreshWardrobe();
+    }
+
     public void RefreshWardrobe()
     {
         if (characterState == null) return;
@@ -1082,6 +1144,38 @@ public class LobbyUI : MonoBehaviour
                 int slimeLvl = ftm.GetSpeciesContactLevel("slime");
                 int succLvl = ftm.GetSpeciesContactLevel("succubus");
                 fleshArchiveText.text = $"FLESH ARCHIVE: Slime [Tier {slimeLvl}/3] | Succubus [Tier {succLvl}/3]";
+            }
+        }
+
+        // Emotion Test Buttons State
+        if (emotionButtons != null && emotionButtons.Length > 0)
+        {
+            string currentExpName = characterState != null && characterState.selectedExpression != null
+                ? characterState.selectedExpression.name
+                : "Normal";
+
+            for (int i = 0; i < emotionButtons.Length; i++)
+            {
+                if (i >= emotionNames.Length) break;
+                string eName = emotionNames[i];
+                bool active = currentExpName.Equals(eName, StringComparison.OrdinalIgnoreCase);
+
+                if (emotionButtonBgs != null && i < emotionButtonBgs.Length && emotionButtonBgs[i] != null)
+                {
+                    if (active)
+                        emotionButtonBgs[i].color = new Color(0.75f, 0.25f, 0.65f, 1f);
+                    else
+                        emotionButtonBgs[i].color = new Color(0.18f, 0.22f, 0.30f, 0.90f);
+                }
+
+                if (emotionButtonTexts != null && i < emotionButtonTexts.Length && emotionButtonTexts[i] != null)
+                {
+                    string label = emotionNames[i];
+                    if (label.Equals("smile", StringComparison.OrdinalIgnoreCase)) label = "Smile";
+                    else if (label.Equals("shocked", StringComparison.OrdinalIgnoreCase)) label = "Shocked";
+
+                    emotionButtonTexts[i].text = active ? $"[{label}]" : label;
+                }
             }
         }
 
@@ -2383,14 +2477,91 @@ public class LobbyUI : MonoBehaviour
         archTxt.color = new Color(0.70f, 0.85f, 0.75f, 1f);
         lobby.fleshArchiveText = archTxt;
 
-        // Available Inventory Items List (Scrollable, cleanly offset below Flesh Stabilization)
+        // Emotion Selection Container (Temporary / Test)
+        GameObject emoBox = new GameObject("EmotionSelectionBox", typeof(RectTransform));
+        emoBox.transform.SetParent(page2.transform, false);
+        Image emoBg = emoBox.AddComponent<Image>();
+        emoBg.color = new Color(0.11f, 0.12f, 0.18f, 0.95f);
+        RectTransform emor = emoBox.GetComponent<RectTransform>();
+        emor.anchorMin = new Vector2(0f, 1f);
+        emor.anchorMax = new Vector2(1f, 1f);
+        emor.pivot = new Vector2(0.5f, 1f);
+        emor.anchoredPosition = new Vector2(0f, -265f);
+        emor.sizeDelta = new Vector2(-60f, 72f);
+        lobby.emotionContainer = emoBox;
+
+        // Emotion Title
+        GameObject emoTitleObj = new GameObject("EmoTitle", typeof(RectTransform));
+        emoTitleObj.transform.SetParent(emoBox.transform, false);
+        RectTransform emotr = emoTitleObj.GetComponent<RectTransform>();
+        emotr.anchorMin = new Vector2(0f, 1f);
+        emotr.anchorMax = new Vector2(1f, 1f);
+        emotr.pivot = new Vector2(0.5f, 1f);
+        emotr.anchoredPosition = new Vector2(15f, -6f);
+        emotr.sizeDelta = new Vector2(-30f, 20f);
+        TextMeshProUGUI emoTitle = emoTitleObj.AddComponent<TextMeshProUGUI>();
+        emoTitle.text = "FACIAL EXPRESSION (Test Panel)";
+        emoTitle.fontSize = 12;
+        emoTitle.fontStyle = FontStyles.Bold;
+        emoTitle.alignment = TextAlignmentOptions.MidlineLeft;
+        emoTitle.color = new Color(0.75f, 0.85f, 1f, 1f);
+
+        // Emotion Buttons Row
+        GameObject emoBtnRow = new GameObject("EmotionButtonsRow", typeof(RectTransform));
+        emoBtnRow.transform.SetParent(emoBox.transform, false);
+        RectTransform ebrr = emoBtnRow.GetComponent<RectTransform>();
+        ebrr.anchorMin = new Vector2(0f, 0f);
+        ebrr.anchorMax = new Vector2(1f, 1f);
+        ebrr.offsetMin = new Vector2(10f, 8f);
+        ebrr.offsetMax = new Vector2(-10f, -26f);
+
+        HorizontalLayoutGroup emoHlg = emoBtnRow.AddComponent<HorizontalLayoutGroup>();
+        emoHlg.spacing = 8;
+        emoHlg.childControlWidth = true;
+        emoHlg.childControlHeight = true;
+        emoHlg.childForceExpandWidth = true;
+        emoHlg.childForceExpandHeight = true;
+
+        string[] emoLabels = { "Normal", "Smile", "Angry", "Annoyed", "Shocked", "Pain", "O" };
+        lobby.emotionButtons = new Button[emoLabels.Length];
+        lobby.emotionButtonBgs = new Image[emoLabels.Length];
+        lobby.emotionButtonTexts = new TextMeshProUGUI[emoLabels.Length];
+
+        for (int i = 0; i < emoLabels.Length; i++)
+        {
+            GameObject ebObj = new GameObject($"EmoBtn_{i}", typeof(RectTransform));
+            ebObj.transform.SetParent(emoBtnRow.transform, false);
+            Image ebBg = ebObj.AddComponent<Image>();
+            ebBg.color = new Color(0.18f, 0.22f, 0.30f, 0.90f);
+            Button ebBtn = ebObj.AddComponent<Button>();
+            ebBtn.targetGraphic = ebBg;
+
+            GameObject ebtObj = new GameObject("Text", typeof(RectTransform));
+            ebtObj.transform.SetParent(ebObj.transform, false);
+            RectTransform ebtrt = ebtObj.GetComponent<RectTransform>();
+            ebtrt.anchorMin = Vector2.zero;
+            ebtrt.anchorMax = Vector2.one;
+            ebtrt.sizeDelta = Vector2.zero;
+            TextMeshProUGUI ebTxt = ebtObj.AddComponent<TextMeshProUGUI>();
+            ebTxt.text = emoLabels[i];
+            ebTxt.fontSize = 12;
+            ebTxt.fontStyle = FontStyles.Bold;
+            ebTxt.alignment = TextAlignmentOptions.Center;
+            ebTxt.color = Color.white;
+
+            lobby.emotionButtons[i] = ebBtn;
+            lobby.emotionButtonBgs[i] = ebBg;
+            lobby.emotionButtonTexts[i] = ebTxt;
+        }
+
+        // Available Inventory Items List (Scrollable, cleanly offset below Emotion Container)
         GameObject scrollObj = new GameObject("ItemsScroll", typeof(RectTransform));
         scrollObj.transform.SetParent(page2.transform, false);
         RectTransform scr = scrollObj.GetComponent<RectTransform>();
         scr.anchorMin = new Vector2(0f, 0f);
         scr.anchorMax = new Vector2(1f, 1f);
         scr.pivot = new Vector2(0.5f, 1f);
-        scr.offsetMax = new Vector2(-30f, -270f);
+        scr.offsetMax = new Vector2(-30f, -348f);
         scr.offsetMin = new Vector2(30f, 15f);
 
         ScrollRect sRect = scrollObj.AddComponent<ScrollRect>();
