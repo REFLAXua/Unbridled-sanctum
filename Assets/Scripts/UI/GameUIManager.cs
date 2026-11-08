@@ -6,7 +6,7 @@ using UnityEngine.InputSystem;
 
 /// <summary>
 /// Top-level UI manager. Orchestrates game flow:
-/// StartMenu -> CharacterCreator -> Lobby (Sanctuary Cave with Wardrobe) <-> Expedition (Fullscreen Map).
+/// StartMenu -> CharacterCreator -> Lobby (Sanctuary Hub Cave) <-> Expedition (Fullscreen Map).
 /// </summary>
 public class GameUIManager : MonoBehaviour
 {
@@ -74,6 +74,7 @@ public class GameUIManager : MonoBehaviour
         if (lobbyUI != null)
         {
             lobbyUI.OnStartExpedition += HandleStartExpedition;
+            lobbyUI.OnReturnToMainMenu += HandleReturnToMainMenu;
         }
 
         if (expeditionMapUI != null)
@@ -107,16 +108,16 @@ public class GameUIManager : MonoBehaviour
             lobbyUI = canvasTrans.GetComponentInChildren<LobbyUI>(true);
             if (lobbyUI == null)
             {
-                lobbyUI = LobbyUI.CreateDynamic(canvasTrans, characterState, inventoryManager);
+                lobbyUI = LobbyUI.CreateDynamic(canvasTrans, characterState, inventoryManager, paperDoll);
             }
             else
             {
-                lobbyUI.Initialize(characterState, inventoryManager);
+                lobbyUI.Initialize(characterState, inventoryManager, paperDoll);
             }
         }
         else
         {
-            lobbyUI.Initialize(characterState, inventoryManager);
+            lobbyUI.Initialize(characterState, inventoryManager, paperDoll);
         }
 
         if (expeditionMapUI == null)
@@ -191,11 +192,16 @@ public class GameUIManager : MonoBehaviour
             characterCreatorUI.OnCharacterAccepted -= HandleCharacterAccepted;
 
         if (lobbyUI != null)
+        {
             lobbyUI.OnStartExpedition -= HandleStartExpedition;
+            lobbyUI.OnReturnToMainMenu -= HandleReturnToMainMenu;
+        }
 
         if (expeditionMapUI != null)
+        {
             expeditionMapUI.OnSurrenderToLobby -= HandleSurrenderToLobby;
             expeditionMapUI.OnFloorCompleted -= HandleFloorCompleted;
+        }
     }
 
     private void Update()
@@ -230,7 +236,8 @@ public class GameUIManager : MonoBehaviour
                 if (startMenuUI != null) startMenuUI.Show();
                 if (characterCreatorUI != null) characterCreatorUI.Hide();
                 if (lobbyUI != null) lobbyUI.Hide();
-                if (expeditionMapUI != null) expeditionMapUI.Hide(); if (combatUI != null) combatUI.Hide();
+                if (expeditionMapUI != null) expeditionMapUI.Hide();
+                if (combatUI != null) combatUI.Hide();
                 if (paperDoll != null)
                 {
                     paperDoll.gameObject.SetActive(false);
@@ -242,7 +249,8 @@ public class GameUIManager : MonoBehaviour
                 if (startMenuUI != null) startMenuUI.Hide();
                 if (characterCreatorUI != null) characterCreatorUI.Show();
                 if (lobbyUI != null) lobbyUI.Hide();
-                if (expeditionMapUI != null) expeditionMapUI.Hide(); if (combatUI != null) combatUI.Hide();
+                if (expeditionMapUI != null) expeditionMapUI.Hide();
+                if (combatUI != null) combatUI.Hide();
                 if (paperDoll != null)
                 {
                     paperDoll.gameObject.SetActive(true);
@@ -254,10 +262,12 @@ public class GameUIManager : MonoBehaviour
             case GameFlowState.Lobby:
                 if (startMenuUI != null) startMenuUI.Hide();
                 if (characterCreatorUI != null) characterCreatorUI.Hide();
-                if (expeditionMapUI != null) expeditionMapUI.Hide(); if (combatUI != null) combatUI.Hide();
+                if (expeditionMapUI != null) expeditionMapUI.Hide();
+                if (combatUI != null) combatUI.Hide();
+                // Base Sanctuary Cave state: Heroine PaperDoll is hidden at rest
                 if (paperDoll != null)
                 {
-                    paperDoll.gameObject.SetActive(true);
+                    paperDoll.gameObject.SetActive(false);
                     paperDoll.SetExpeditionMode(false);
                     paperDoll.SetZoomControlsVisible(true);
                 }
@@ -303,6 +313,11 @@ public class GameUIManager : MonoBehaviour
     private void HandleSurrenderToLobby()
     {
         SetState(GameFlowState.Lobby);
+    }
+
+    private void HandleReturnToMainMenu()
+    {
+        SetState(GameFlowState.StartMenu);
     }
 
     private void HandleFloorCompleted(int completedFloor)
