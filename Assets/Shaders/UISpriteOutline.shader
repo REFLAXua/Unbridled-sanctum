@@ -10,6 +10,10 @@ Shader "Custom/UI/SpriteOutline"
         _OutlineWidth ("Outline Width", Range(0, 20)) = 0
         _AlphaThreshold ("Alpha Cutoff", Range(0.01, 0.5)) = 0.05
 
+        [Header(Glow and Brightness Settings)]
+        _HoverBrightness ("Hover Brightness", Range(0.5, 3.0)) = 1.0
+        _GlowColor ("Glow Color", Color) = (1.0, 0.94, 0.75, 0.0)
+
         _StencilComp ("Stencil Comparison", Float) = 8
         _Stencil ("Stencil ID", Float) = 0
         _StencilOp ("Stencil Operation", Float) = 0
@@ -83,6 +87,8 @@ Shader "Custom/UI/SpriteOutline"
             fixed4 _OutlineColor;
             float _OutlineWidth;
             float _AlphaThreshold;
+            float _HoverBrightness;
+            fixed4 _GlowColor;
             float4 _ClipRect;
 
             v2f vert(appdata_t v)
@@ -99,11 +105,15 @@ Shader "Custom/UI/SpriteOutline"
 
             fixed4 frag(v2f IN) : SV_Target
             {
-                half4 color = tex2D(_MainTex, IN.texcoord) * IN.color;
+                half4 rawCol = tex2D(_MainTex, IN.texcoord) * IN.color;
 
                 #ifdef UNITY_UI_CLIP_RECT
-                color.a *= UnityGet2DClipping(IN.worldPosition.xy, _ClipRect);
+                rawCol.a *= UnityGet2DClipping(IN.worldPosition.xy, _ClipRect);
                 #endif
+
+                // Apply hover brightness and warm sunlight bloom to visible pixels
+                half3 litRgb = rawCol.rgb * _HoverBrightness + _GlowColor.rgb * (_GlowColor.a * rawCol.a);
+                half4 color = half4(litRgb, rawCol.a);
 
                 // If outline is disabled or negligible, return sprite directly
                 if (_OutlineWidth <= 0.05)

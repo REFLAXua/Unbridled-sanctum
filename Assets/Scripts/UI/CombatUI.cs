@@ -106,6 +106,10 @@ namespace UnbridledSanctum.UI
         public GameObject endTurnFocusBorder;
         public RectTransform endTurnRect;
 
+        [Header("Card Skin")]
+        public Sprite cardFrameSprite;
+        public Sprite progressbarFrameSprite;
+
         [Header("Top Header Actions")]
         public Button surrenderButton;
         public Button debugWinHpButton;
@@ -2957,44 +2961,54 @@ namespace UnbridledSanctum.UI
             GameObject statusPlate = new GameObject("StatusPlate", typeof(RectTransform));
             statusPlate.transform.SetParent(cardObj.transform, false);
             Image spBg = statusPlate.AddComponent<Image>();
-            spBg.color = new Color(0.08f, 0.10f, 0.14f, 0.88f);
+            if (progressbarFrameSprite == null) progressbarFrameSprite = LoadUISprite("ui_progressbar_frame.png");
+            if (progressbarFrameSprite != null)
+            {
+                spBg.sprite = progressbarFrameSprite;
+                spBg.type = Image.Type.Sliced;
+                spBg.color = Color.white;
+            }
+            else
+            {
+                spBg.color = new Color(0.08f, 0.10f, 0.14f, 0.88f);
+            }
             spBg.raycastTarget = false;
             RectTransform sprt = statusPlate.GetComponent<RectTransform>();
             sprt.anchorMin = new Vector2(0.5f, 0.05f);
             sprt.anchorMax = new Vector2(0.5f, 0.05f);
             sprt.pivot = new Vector2(0.5f, 0.5f);
             sprt.anchoredPosition = Vector2.zero;
-            sprt.sizeDelta = new Vector2(260f, 54f);
+            sprt.sizeDelta = new Vector2(260f, 64f);
 
-            // HP Text
+            // HP Text (Cleanly inset within dark inner cavity, clear of 16px top wooden border)
             GameObject hpObj = new GameObject("HPText", typeof(RectTransform));
             hpObj.transform.SetParent(statusPlate.transform, false);
             TextMeshProUGUI hpTxt = hpObj.AddComponent<TextMeshProUGUI>();
-            hpTxt.fontSize = 15;
+            hpTxt.fontSize = 13;
             hpTxt.fontStyle = FontStyles.Bold;
             hpTxt.alignment = TextAlignmentOptions.Center;
             hpTxt.color = new Color(0.35f, 0.90f, 0.45f, 1f);
             hpTxt.raycastTarget = false;
             RectTransform hrt = hpObj.GetComponent<RectTransform>();
-            hrt.anchorMin = new Vector2(0f, 0.5f);
-            hrt.anchorMax = new Vector2(1f, 1f);
-            hrt.anchoredPosition = Vector2.zero;
-            hrt.sizeDelta = Vector2.zero;
+            hrt.anchorMin = new Vector2(0.06f, 0.50f);
+            hrt.anchorMax = new Vector2(0.94f, 1.0f);
+            hrt.offsetMin = Vector2.zero;
+            hrt.offsetMax = new Vector2(0f, -14f);
 
-            // Seduction Text
+            // Seduction Text (Cleanly inset within dark inner cavity, clear of 16px bottom wooden border)
             GameObject sedObj = new GameObject("SedText", typeof(RectTransform));
             sedObj.transform.SetParent(statusPlate.transform, false);
             TextMeshProUGUI sedTxt = sedObj.AddComponent<TextMeshProUGUI>();
-            sedTxt.fontSize = 13;
+            sedTxt.fontSize = 12;
             sedTxt.fontStyle = FontStyles.Bold;
             sedTxt.alignment = TextAlignmentOptions.Center;
             sedTxt.color = new Color(1f, 0.50f, 0.80f, 1f);
             sedTxt.raycastTarget = false;
             RectTransform srt2 = sedObj.GetComponent<RectTransform>();
-            srt2.anchorMin = new Vector2(0f, 0f);
-            srt2.anchorMax = new Vector2(1f, 0.5f);
-            srt2.anchoredPosition = Vector2.zero;
-            srt2.sizeDelta = Vector2.zero;
+            srt2.anchorMin = new Vector2(0.06f, 0.0f);
+            srt2.anchorMax = new Vector2(0.94f, 0.50f);
+            srt2.offsetMin = new Vector2(0f, 14f);
+            srt2.offsetMax = Vector2.zero;
 
             GameObject mpObj = new GameObject("MPText", typeof(RectTransform));
             mpObj.transform.SetParent(statusPlate.transform, false);
@@ -3111,7 +3125,16 @@ namespace UnbridledSanctum.UI
             vrRt.offsetMax = Vector2.zero;
 
             Image bg = visualRootObj.AddComponent<Image>();
-            bg.color = Color.black;
+            if (cardFrameSprite == null) cardFrameSprite = LoadUISprite("ui_card_frame.png");
+            if (cardFrameSprite != null)
+            {
+                bg.sprite = cardFrameSprite;
+                bg.color = Color.white;
+            }
+            else
+            {
+                bg.color = Color.black;
+            }
 
             Button btn = cardObj.AddComponent<Button>();
             btn.targetGraphic = bg;
@@ -3147,6 +3170,7 @@ namespace UnbridledSanctum.UI
             }
             restingBorderImg.color = borderCol;
             restingBorderImg.raycastTarget = false;
+            restingBorderObj.SetActive(cardFrameSprite == null);
             RectTransform rbrt = restingBorderObj.GetComponent<RectTransform>();
             rbrt.anchorMin = Vector2.zero;
             rbrt.anchorMax = Vector2.one;
@@ -3189,10 +3213,25 @@ namespace UnbridledSanctum.UI
             artWindow.transform.SetParent(visualRootObj.transform, false);
             artWindow.AddComponent<RectMask2D>();
             RectTransform winRt = artWindow.GetComponent<RectTransform>();
-            winRt.anchorMin = Vector2.zero;
-            winRt.anchorMax = Vector2.one;
-            winRt.offsetMin = new Vector2(3f, 37f);
-            winRt.offsetMax = new Vector2(-3f, -3f);
+
+            if (cardFrameSprite != null)
+            {
+                winRt.anchorMin = new Vector2(0.06f, 0.33f);
+                winRt.anchorMax = new Vector2(0.94f, 0.94f);
+                winRt.offsetMin = Vector2.zero;
+                winRt.offsetMax = Vector2.zero;
+
+                Image winBg = artWindow.AddComponent<Image>();
+                winBg.color = new Color(0.05f, 0.05f, 0.07f, 1f);
+                winBg.raycastTarget = false;
+            }
+            else
+            {
+                winRt.anchorMin = Vector2.zero;
+                winRt.anchorMax = Vector2.one;
+                winRt.offsetMin = new Vector2(3f, 37f);
+                winRt.offsetMax = new Vector2(-3f, -3f);
+            }
 
             // Card Art Image (proportional fit inside the window, zoomed to fill height without distortion)
             GameObject artObj = new GameObject("CardArt", typeof(RectTransform));
@@ -3201,11 +3240,10 @@ namespace UnbridledSanctum.UI
             artImg.preserveAspect = true;
             artImg.raycastTarget = false;
             RectTransform artRt = artObj.GetComponent<RectTransform>();
-            artRt.anchorMin = new Vector2(0.5f, 0.5f);
-            artRt.anchorMax = new Vector2(0.5f, 0.5f);
-            artRt.pivot = new Vector2(0.5f, 0.5f);
-            artRt.anchoredPosition = Vector2.zero;
-            artRt.sizeDelta = new Vector2(310f, 170f);
+            artRt.anchorMin = Vector2.zero;
+            artRt.anchorMax = Vector2.one;
+            artRt.offsetMin = Vector2.zero;
+            artRt.offsetMax = Vector2.zero;
             Sprite art = card.data.cardArt != null ? card.data.cardArt : SkillArtDatabase.GetSkillSprite(card.data.id);
             if (art != null)
             {
@@ -3229,20 +3267,21 @@ namespace UnbridledSanctum.UI
             sepRt.pivot = new Vector2(0.5f, 0f);
             sepRt.anchoredPosition = new Vector2(0f, 35f);
             sepRt.sizeDelta = new Vector2(0f, 2f);
+            sepObj.SetActive(cardFrameSprite == null);
 
             // AP Cost Badge (Top-Left ornate RPG coin / badge)
             GameObject apObj = new GameObject("ApBadge", typeof(RectTransform));
             apObj.transform.SetParent(visualRootObj.transform, false);
 
             Image apRim = apObj.AddComponent<Image>();
-            apRim.color = new Color(0.35f, 0.26f, 0.10f, 1f);
+            apRim.color = borderCol;
             apRim.raycastTarget = false;
             RectTransform apr = apObj.GetComponent<RectTransform>();
             apr.anchorMin = new Vector2(0f, 1f);
             apr.anchorMax = new Vector2(0f, 1f);
             apr.pivot = new Vector2(0f, 1f);
-            apr.anchoredPosition = new Vector2(5f, -5f);
-            apr.sizeDelta = new Vector2(30f, 30f);
+            apr.anchoredPosition = new Vector2(4f, -4f);
+            apr.sizeDelta = new Vector2(28f, 28f);
 
             GameObject apInner = new GameObject("Inner", typeof(RectTransform));
             apInner.transform.SetParent(apObj.transform, false);
@@ -3269,24 +3308,39 @@ namespace UnbridledSanctum.UI
             aptr.anchorMax = Vector2.one;
             aptr.sizeDelta = Vector2.zero;
 
-            // Name Plate (Bottom Banner, deep solid black)
+            // Name Plate (Bottom Banner)
             GameObject nameObj = new GameObject("NamePlate", typeof(RectTransform));
             nameObj.transform.SetParent(visualRootObj.transform, false);
             Image nameBg = nameObj.AddComponent<Image>();
-            nameBg.color = new Color(0.04f, 0.04f, 0.06f, 1f);
             nameBg.raycastTarget = false;
             RectTransform nrt = nameObj.GetComponent<RectTransform>();
-            nrt.anchorMin = new Vector2(0f, 0f);
-            nrt.anchorMax = new Vector2(1f, 0f);
-            nrt.pivot = new Vector2(0.5f, 0f);
-            nrt.anchoredPosition = Vector2.zero;
-            nrt.sizeDelta = new Vector2(0f, 36f);
+
+            if (cardFrameSprite != null)
+            {
+                nameBg.color = Color.clear;
+                nrt.anchorMin = new Vector2(0.14f, 0.08f);
+                nrt.anchorMax = new Vector2(0.86f, 0.28f);
+                nrt.offsetMin = Vector2.zero;
+                nrt.offsetMax = Vector2.zero;
+            }
+            else
+            {
+                nameBg.color = new Color(0.04f, 0.04f, 0.06f, 1f);
+                nrt.anchorMin = new Vector2(0f, 0f);
+                nrt.anchorMax = new Vector2(1f, 0f);
+                nrt.pivot = new Vector2(0.5f, 0f);
+                nrt.anchoredPosition = Vector2.zero;
+                nrt.sizeDelta = new Vector2(0f, 36f);
+            }
 
             GameObject nameTxtObj = new GameObject("Text", typeof(RectTransform));
             nameTxtObj.transform.SetParent(nameObj.transform, false);
             TextMeshProUGUI nameTxt = nameTxtObj.AddComponent<TextMeshProUGUI>();
             nameTxt.text = card.data.cardName;
-            nameTxt.fontSize = 15;
+            nameTxt.enableAutoSizing = true;
+            nameTxt.fontSizeMin = 8f;
+            nameTxt.fontSizeMax = 14f;
+            nameTxt.lineSpacing = -8;
             nameTxt.fontStyle = FontStyles.Bold;
             nameTxt.alignment = TextAlignmentOptions.Center;
             nameTxt.color = new Color(0.96f, 0.94f, 0.90f, 1f);
@@ -4073,6 +4127,19 @@ namespace UnbridledSanctum.UI
             trt.sizeDelta = Vector2.zero;
 
             return btn;
+        }
+
+        private static Sprite LoadUISprite(string fileName)
+        {
+#if UNITY_EDITOR
+            string path = $"Assets/sprites/UI/{fileName}";
+            Sprite spr = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>(path);
+            if (spr != null) return spr;
+            UnityEditor.AssetDatabase.ImportAsset(path, UnityEditor.ImportAssetOptions.ForceUpdate);
+            return UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>(path);
+#else
+            return null;
+#endif
         }
     }
 }

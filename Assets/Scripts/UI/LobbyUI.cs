@@ -44,6 +44,13 @@ public class LobbyUI : MonoBehaviour
     public Sprite chestSprite;
     public Sprite settingsSprite;
 
+    [Header("UI Skin Sprites")]
+    public Sprite woodPanelSprite;
+    public Sprite woodSlotSprite;
+    public Sprite woodButtonSprite;
+    public Sprite cardFrameSprite;
+    public Sprite woodProgressFrameSprite;
+
     [Header("Overlays")]
     public GameObject wardrobeOverlay;
     public GameObject deckOverlay;
@@ -231,12 +238,870 @@ public class LobbyUI : MonoBehaviour
             }
         }
 
+        if (filterAllBtn == null && deckOverlay != null)
+        {
+            Button[] deckBtns = deckOverlay.GetComponentsInChildren<Button>(true);
+            foreach (var b in deckBtns)
+            {
+                string bn = b.gameObject.name.ToLowerInvariant();
+                Image bg = b.GetComponent<Image>();
+                TextMeshProUGUI t = b.GetComponentInChildren<TextMeshProUGUI>(true);
+                if (bn.Contains("filterbtn_all")) { filterAllBtn = b; filterAllBg = bg; filterAllText = t; }
+                else if (bn.Contains("filterbtn_warriortactics") || bn.Contains("filterbtn_tactics")) { filterTacticsBtn = b; filterTacticsBg = bg; filterTacticsText = t; }
+                else if (bn.Contains("filterbtn_lustinstincts") || bn.Contains("filterbtn_lust")) { filterLustBtn = b; filterLustBg = bg; filterLustText = t; }
+                else if (bn.Contains("filterbtn_struggleactions") || bn.Contains("filterbtn_struggle")) { filterStruggleBtn = b; filterStruggleBg = bg; filterStruggleText = t; }
+            }
+        }
+
+        ConfigureInteractiveCaveObjects();
         EnsureOverlaysContainerAndPanels();
+        ApplyWoodPanelSkin();
         SetupListeners();
+    }
+
+    public static Sprite LoadUISprite(string fileName)
+    {
+#if UNITY_EDITOR
+        string path = $"Assets/sprites/UI/{fileName}";
+        Sprite spr = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>(path);
+        if (spr != null) return spr;
+
+        UnityEditor.AssetDatabase.ImportAsset(path, UnityEditor.ImportAssetOptions.ForceUpdate);
+        spr = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>(path);
+        if (spr != null) return spr;
+
+        UnityEngine.Object[] subs = UnityEditor.AssetDatabase.LoadAllAssetsAtPath(path);
+        foreach (var sub in subs)
+        {
+            if (sub is Sprite s) return s;
+        }
+#endif
+        return null;
+    }
+
+    public void ApplyWoodPanelSkin()
+    {
+        if (woodPanelSprite == null)
+        {
+            woodPanelSprite = LoadUISprite("ui_panel_wood.png");
+        }
+
+        if (woodSlotSprite == null)
+        {
+            woodSlotSprite = LoadUISprite("ui_slot_wood.png");
+        }
+
+        if (woodButtonSprite == null)
+        {
+            woodButtonSprite = LoadUISprite("ui_button.png");
+        }
+
+        if (woodProgressFrameSprite == null)
+        {
+            woodProgressFrameSprite = LoadUISprite("ui_progressbar_frame.png");
+        }
+
+        if (woodPanelSprite != null)
+        {
+            // 1. Settings modal card
+            if (settingsOverlay != null)
+            {
+                Transform card = settingsOverlay.transform.Find("SettingsModalCard");
+                if (card != null) ApplySlicedWoodBg(card.gameObject);
+            }
+
+            // 2. Wardrobe panel
+            if (wardrobeOverlay != null)
+            {
+                Transform wp = wardrobeOverlay.transform.Find("WardrobePanel");
+                if (wp != null) ApplySlicedWoodBg(wp.gameObject);
+            }
+
+            // 3. Deckbuilder panel & detail panel
+            if (deckOverlay != null)
+            {
+                Transform dp = deckOverlay.transform.Find("CardDetailPanel") 
+                    ?? deckOverlay.transform.Find("DeckPanel/TopCardSelectionSection/DetailPanel")
+                    ?? deckOverlay.transform.Find("DeckbuilderPanel/TopCardSelectionSection/CardDetailPanel")
+                    ?? deckOverlay.transform.Find("DeckbuilderPanel/TopCardSelectionSection/DetailPanel");
+                if (dp != null) ApplySlicedWoodBg(dp.gameObject);
+
+                Transform dPanel = deckOverlay.transform.Find("DeckPanel") ?? deckOverlay.transform.Find("DeckbuilderPanel");
+                if (dPanel != null) ApplySlicedWoodBg(dPanel.gameObject);
+            }
+
+            // 4. Desire Tree panel & detail panel
+            if (pathsOverlay != null)
+            {
+                Transform tp = pathsOverlay.transform.Find("TreeDetailPanel") ?? pathsOverlay.transform.Find("PathsPanel/TreeDetailPanel");
+                if (tp != null) ApplySlicedWoodBg(tp.gameObject);
+
+                Transform pPanel = pathsOverlay.transform.Find("PathsPanel");
+                if (pPanel != null) ApplySlicedWoodBg(pPanel.gameObject);
+
+                Transform treeLeft = pathsOverlay.transform.Find("PathsPanel/TreeNodesArea") ?? pathsOverlay.transform.Find("TreeNodesArea");
+                if (treeLeft != null)
+                {
+                    Outline tlaOutline = treeLeft.GetComponent<Outline>();
+                    if (tlaOutline != null) tlaOutline.enabled = false;
+                }
+            }
+        }
+
+        if (woodSlotSprite != null)
+        {
+            // Wardrobe inset boxes
+            if (wardrobeOverlay != null)
+            {
+                Transform eqBox = wardrobeOverlay.transform.Find("WardrobePanel/EquippedBox") ?? wardrobeOverlay.transform.Find("EquippedBox");
+                if (eqBox != null) ApplySlicedWoodSlot(eqBox.gameObject);
+
+                Transform stabBox = wardrobeOverlay.transform.Find("WardrobePanel/FleshStabilizationBox") ?? wardrobeOverlay.transform.Find("FleshStabilizationBox");
+                if (stabBox != null) ApplySlicedWoodSlot(stabBox.gameObject);
+
+                Transform emoBox = wardrobeOverlay.transform.Find("WardrobePanel/EmotionSelectionBox") 
+                    ?? wardrobeOverlay.transform.Find("WardrobePanel/EmotionBox") 
+                    ?? wardrobeOverlay.transform.Find("EmotionSelectionBox") 
+                    ?? wardrobeOverlay.transform.Find("EmotionBox");
+                if (emoBox != null) ApplySlicedWoodSlot(emoBox.gameObject);
+            }
+
+            // Deckbuilder inset boxes
+            if (deckOverlay != null)
+            {
+                Transform colPanel = deckOverlay.transform.Find("CollectionPanel") ?? deckOverlay.transform.Find("DeckbuilderPanel/CollectionPanel");
+                if (colPanel != null) ApplySlicedWoodSlot(colPanel.gameObject);
+
+                Transform actPanel = deckOverlay.transform.Find("ActiveDeckBar") ?? deckOverlay.transform.Find("DeckbuilderPanel/ActiveDeckBar");
+                if (actPanel != null) ApplySlicedWoodSlot(actPanel.gameObject);
+            }
+
+            // Tree scroll box
+            if (pathsOverlay != null)
+            {
+                Transform treeScroll = pathsOverlay.transform.Find("TreeScrollRect") ?? pathsOverlay.transform.Find("PathsPanel/TreeScrollRect");
+                if (treeScroll != null) ApplySlicedWoodSlot(treeScroll.gameObject);
+            }
+        }
+
+        if (woodButtonSprite != null)
+        {
+            // 1. Back / Close buttons across all overlays
+            var allBackBtns = new[] { wardrobeCloseBtn, deckCloseBtn, pathsCloseBtn, settingsCloseBtn };
+            foreach (var b in allBackBtns)
+            {
+                if (b != null)
+                {
+                    ApplySlicedWoodButton(b.gameObject, Color.white);
+                    var txt = b.GetComponentInChildren<TextMeshProUGUI>(true);
+                    if (txt != null && !string.IsNullOrEmpty(txt.text))
+                    {
+                        txt.color = new Color(0.92f, 0.88f, 0.78f, 1f);
+                        txt.text = txt.text.Replace("✕", "X").Replace("\u2715", "X").Replace("▢", "").Trim();
+                        if (string.IsNullOrEmpty(txt.text)) txt.text = "X";
+                    }
+                }
+            }
+
+            // Also check CloseXBtn in settingsOverlay
+            if (settingsOverlay != null)
+            {
+                Transform xBtn = settingsOverlay.transform.Find("SettingsModalCard/CloseXBtn");
+                if (xBtn != null)
+                {
+                    ApplySlicedWoodButton(xBtn.gameObject, Color.white);
+                    var txt = xBtn.GetComponentInChildren<TextMeshProUGUI>(true);
+                    if (txt != null && !string.IsNullOrEmpty(txt.text))
+                    {
+                        txt.color = new Color(0.92f, 0.88f, 0.78f, 1f);
+                        txt.text = txt.text.Replace("✕", "X").Replace("\u2715", "X").Replace("▢", "").Trim();
+                        if (string.IsNullOrEmpty(txt.text)) txt.text = "X";
+                    }
+                }
+            }
+
+            // 2. Wardrobe action buttons
+            if (unequipClothesBtn != null) ApplySlicedWoodButton(unequipClothesBtn.gameObject, new Color(0.92f, 0.65f, 0.65f, 1f));
+            if (repairClothesBtn != null) ApplySlicedWoodButton(repairClothesBtn.gameObject, new Color(0.75f, 0.95f, 0.80f, 1f));
+            if (fleshDebugFillBtn != null) ApplySlicedWoodButton(fleshDebugFillBtn.gameObject, new Color(0.85f, 0.75f, 0.90f, 1f));
+
+            if (bodySizeButtons != null)
+            {
+                foreach (var b in bodySizeButtons)
+                {
+                    if (b != null) ApplySlicedWoodButton(b.gameObject);
+                }
+            }
+
+            if (emotionButtons != null)
+            {
+                foreach (var b in emotionButtons)
+                {
+                    if (b != null) ApplySlicedWoodButton(b.gameObject);
+                }
+            }
+
+            // 3. Deckbuilder buttons
+            if (detailEquipBtn != null) ApplySlicedWoodButton(detailEquipBtn.gameObject);
+            if (filterAllBtn != null) ApplySlicedWoodButton(filterAllBtn.gameObject);
+            if (filterTacticsBtn != null) ApplySlicedWoodButton(filterTacticsBtn.gameObject);
+            if (filterLustBtn != null) ApplySlicedWoodButton(filterLustBtn.gameObject);
+            if (filterStruggleBtn != null) ApplySlicedWoodButton(filterStruggleBtn.gameObject);
+
+            // 4. Settings controls
+            if (settingsFullscreenToggleBtn != null) ApplySlicedWoodButton(settingsFullscreenToggleBtn.gameObject, new Color(0.85f, 0.82f, 0.78f, 1f));
+            if (settingsMainMenuBtn != null) ApplySlicedWoodButton(settingsMainMenuBtn.gameObject, new Color(0.90f, 0.65f, 0.65f, 1f));
+
+            if (settingsMasterSlider != null)
+            {
+                if (settingsMasterSlider.handleRect != null)
+                {
+                    Image handleImg = settingsMasterSlider.handleRect.GetComponent<Image>();
+                    if (handleImg != null)
+                    {
+                        handleImg.sprite = woodButtonSprite;
+                        handleImg.type = Image.Type.Sliced;
+                        handleImg.color = new Color(1.15f, 1.10f, 0.95f, 1f);
+                    }
+                }
+                Transform slBg = settingsMasterSlider.transform.Find("Background");
+                if (slBg != null)
+                {
+                    Image bgImg = slBg.GetComponent<Image>();
+                    if (bgImg != null)
+                    {
+                        bgImg.sprite = woodProgressFrameSprite != null ? woodProgressFrameSprite : woodSlotSprite;
+                        bgImg.type = Image.Type.Sliced;
+                        bgImg.color = Color.white;
+                    }
+                    Outline ol = slBg.GetComponent<Outline>();
+                    if (ol != null) ol.enabled = false;
+                }
+
+                Transform slFill = settingsMasterSlider.transform.Find("Fill Area/Fill");
+                if (slFill != null)
+                {
+                    Image fillImg = slFill.GetComponent<Image>();
+                    if (fillImg != null)
+                    {
+                        fillImg.color = new Color(0.85f, 0.65f, 0.25f, 0.95f);
+                    }
+                }
+            }
+
+            // 5. Desire Tree tabs & action buttons
+            if (treePathPhallusBtn != null) ApplySlicedWoodButton(treePathPhallusBtn.gameObject);
+            if (treePathBoundBtn != null) ApplySlicedWoodButton(treePathBoundBtn.gameObject);
+            if (treePathMonsterBtn != null) ApplySlicedWoodButton(treePathMonsterBtn.gameObject);
+            if (treeOverlaySelectBtn != null) ApplySlicedWoodButton(treeOverlaySelectBtn.gameObject);
+            if (treePurchaseBtn != null) ApplySlicedWoodButton(treePurchaseBtn.gameObject);
+        }
+
+        ApplyWardrobeLayoutPaddings();
+        ApplySettingsLayoutPaddings();
+        ApplyPathsLayoutPaddings();
+        ApplyDeckLayoutPaddings();
+    }
+
+    public void ApplyWardrobeLayoutPaddings()
+    {
+        if (wardrobeOverlay == null) return;
+
+        Transform wp = wardrobeOverlay.transform.Find("WardrobePanel") ?? wardrobeOverlay.transform;
+
+        // 1. Header Title
+        Transform title = wp.Find("Title");
+        if (title != null)
+        {
+            RectTransform tr = title.GetComponent<RectTransform>();
+            if (tr != null)
+            {
+                tr.anchoredPosition = new Vector2(32f, -22f);
+                tr.sizeDelta = new Vector2(0f, 36f);
+            }
+        }
+
+        // 2. Back button
+        Transform back = wp.Find("BackBtn");
+        if (back != null)
+        {
+            RectTransform br = back.GetComponent<RectTransform>();
+            if (br != null)
+            {
+                br.anchoredPosition = new Vector2(-28f, -20f);
+                br.sizeDelta = new Vector2(170f, 38f);
+            }
+        }
+
+        // 3. EquippedBox
+        Transform eqBox = wp.Find("EquippedBox");
+        if (eqBox != null)
+        {
+            RectTransform eqr = eqBox.GetComponent<RectTransform>();
+            if (eqr != null)
+            {
+                eqr.anchoredPosition = new Vector2(0f, -70f);
+                eqr.sizeDelta = new Vector2(-56f, 68f);
+            }
+
+            Transform eqTxt = eqBox.Find("Text");
+            if (eqTxt != null)
+            {
+                RectTransform tr = eqTxt.GetComponent<RectTransform>();
+                if (tr != null)
+                {
+                    tr.anchoredPosition = new Vector2(24f, 0f);
+                    tr.sizeDelta = new Vector2(-280f, 0f);
+                }
+            }
+
+            Transform stripBtn = eqBox.Find("UnequipClothesBtn");
+            if (stripBtn != null)
+            {
+                RectTransform sr = stripBtn.GetComponent<RectTransform>();
+                if (sr != null)
+                {
+                    sr.anchoredPosition = new Vector2(-24f, 0f);
+                    sr.sizeDelta = new Vector2(110f, 36f);
+                }
+            }
+
+            Transform repBtn = eqBox.Find("RepairClothesBtn");
+            if (repBtn != null)
+            {
+                RectTransform rr = repBtn.GetComponent<RectTransform>();
+                if (rr != null)
+                {
+                    rr.anchoredPosition = new Vector2(-144f, 0f);
+                    rr.sizeDelta = new Vector2(125f, 36f);
+                }
+            }
+        }
+
+        // 4. FleshStabilizationBox
+        Transform stabBox = wp.Find("FleshStabilizationBox");
+        if (stabBox != null)
+        {
+            RectTransform stbr = stabBox.GetComponent<RectTransform>();
+            if (stbr != null)
+            {
+                stbr.anchoredPosition = new Vector2(0f, -148f);
+                stbr.sizeDelta = new Vector2(-56f, 132f);
+            }
+
+            Transform stTitle = stabBox.Find("StabTitle");
+            if (stTitle != null)
+            {
+                RectTransform str = stTitle.GetComponent<RectTransform>();
+                if (str != null)
+                {
+                    str.anchoredPosition = new Vector2(24f, -14f);
+                    str.sizeDelta = new Vector2(-48f, 22f);
+                }
+            }
+
+            Transform sizeRow = stabBox.Find("SizeButtonsRow");
+            if (sizeRow != null)
+            {
+                RectTransform srr = sizeRow.GetComponent<RectTransform>();
+                if (srr != null)
+                {
+                    srr.anchoredPosition = new Vector2(0f, -42f);
+                    srr.sizeDelta = new Vector2(-48f, 36f);
+                }
+            }
+
+            Transform infoRow = stabBox.Find("InfoRow");
+            if (infoRow != null)
+            {
+                RectTransform ir = infoRow.GetComponent<RectTransform>();
+                if (ir != null)
+                {
+                    ir.anchoredPosition = new Vector2(0f, 14f);
+                    ir.sizeDelta = new Vector2(-48f, 32f);
+                }
+            }
+        }
+
+        // 5. EmotionSelectionBox
+        Transform emoBox = wp.Find("EmotionSelectionBox") ?? wp.Find("EmotionBox");
+        if (emoBox != null)
+        {
+            RectTransform emr = emoBox.GetComponent<RectTransform>();
+            if (emr != null)
+            {
+                emr.anchoredPosition = new Vector2(0f, -290f);
+                emr.sizeDelta = new Vector2(-56f, 84f);
+            }
+
+            Transform emoTitle = emoBox.Find("EmoTitle");
+            if (emoTitle != null)
+            {
+                RectTransform etr = emoTitle.GetComponent<RectTransform>();
+                if (etr != null)
+                {
+                    etr.anchoredPosition = new Vector2(24f, -12f);
+                    etr.sizeDelta = new Vector2(-48f, 20f);
+                }
+            }
+
+            Transform emoRow = emoBox.Find("EmotionButtonsRow");
+            if (emoRow != null)
+            {
+                RectTransform err = emoRow.GetComponent<RectTransform>();
+                if (err != null)
+                {
+                    err.offsetMin = new Vector2(24f, 10f);
+                    err.offsetMax = new Vector2(-24f, -32f);
+                }
+            }
+        }
+
+        // 6. ItemsScroll
+        Transform scroll = wp.Find("ItemsScroll");
+        if (scroll != null)
+        {
+            RectTransform scr = scroll.GetComponent<RectTransform>();
+            if (scr != null)
+            {
+                scr.offsetMax = new Vector2(-28f, -384f);
+                scr.offsetMin = new Vector2(28f, 25f);
+            }
+
+            VerticalLayoutGroup vlg = scroll.GetComponentInChildren<VerticalLayoutGroup>();
+            if (vlg != null)
+            {
+                vlg.spacing = 10f;
+            }
+        }
+    }
+
+    public void ApplySettingsLayoutPaddings()
+    {
+        if (settingsOverlay == null) return;
+        Transform card = settingsOverlay.transform.Find("SettingsModalCard");
+        if (card == null) return;
+
+        RectTransform cardRt = card.GetComponent<RectTransform>();
+        if (cardRt != null)
+        {
+            cardRt.sizeDelta = new Vector2(600f, 360f);
+        }
+
+        Transform title = card.Find("Title");
+        if (title != null)
+        {
+            RectTransform tr = title.GetComponent<RectTransform>();
+            if (tr != null)
+            {
+                tr.anchoredPosition = new Vector2(32f, -22f);
+                tr.sizeDelta = new Vector2(-120f, 32f);
+            }
+        }
+
+        Transform xBtn = card.Find("CloseXBtn");
+        if (xBtn != null)
+        {
+            RectTransform xr = xBtn.GetComponent<RectTransform>();
+            if (xr != null)
+            {
+                xr.anchoredPosition = new Vector2(-26f, -20f);
+                xr.sizeDelta = new Vector2(38f, 38f);
+            }
+        }
+
+        Transform content = card.Find("ContentArea");
+        if (content != null)
+        {
+            RectTransform cr = content.GetComponent<RectTransform>();
+            if (cr != null)
+            {
+                cr.offsetMin = new Vector2(36f, 30f);
+                cr.offsetMax = new Vector2(-36f, -70f);
+            }
+
+            Transform volLabel = content.Find("VolumeLabel");
+            if (volLabel != null)
+            {
+                RectTransform vr = volLabel.GetComponent<RectTransform>();
+                if (vr != null)
+                {
+                    vr.anchoredPosition = new Vector2(0f, -6f);
+                    vr.sizeDelta = new Vector2(0f, 26f);
+                }
+            }
+
+            Transform slider = content.Find("MasterSlider");
+            if (slider != null)
+            {
+                RectTransform sr = slider.GetComponent<RectTransform>();
+                if (sr != null)
+                {
+                    sr.anchoredPosition = new Vector2(0f, -38f);
+                    sr.sizeDelta = new Vector2(0f, 28f);
+                }
+
+                Transform handleArea = slider.Find("Handle Slide Area");
+                if (handleArea != null)
+                {
+                    RectTransform har = handleArea.GetComponent<RectTransform>();
+                    if (har != null)
+                    {
+                        har.offsetMin = new Vector2(14f, 0f);
+                        har.offsetMax = new Vector2(-14f, 0f);
+                    }
+                }
+            }
+
+            Transform fsBtn = content.Find("FullscreenToggleBtn");
+            if (fsBtn != null)
+            {
+                RectTransform fr = fsBtn.GetComponent<RectTransform>();
+                if (fr != null)
+                {
+                    fr.anchoredPosition = new Vector2(0f, -96f);
+                    fr.sizeDelta = new Vector2(0f, 44f);
+                }
+            }
+
+            Transform mmBtn = content.Find("MainMenuBtn");
+            if (mmBtn != null)
+            {
+                RectTransform mr = mmBtn.GetComponent<RectTransform>();
+                if (mr != null)
+                {
+                    mr.anchoredPosition = new Vector2(0f, 8f);
+                    mr.sizeDelta = new Vector2(0f, 44f);
+                }
+            }
+        }
+    }
+
+    public void ApplyPathsLayoutPaddings()
+    {
+        if (pathsOverlay == null) return;
+        Transform pp = pathsOverlay.transform.Find("PathsPanel") ?? pathsOverlay.transform;
+
+        // 1. Top Bar
+        Transform topBar = pp.Find("TreeTopBar");
+        if (topBar != null)
+        {
+            RectTransform tbr = topBar.GetComponent<RectTransform>();
+            if (tbr != null)
+            {
+                tbr.anchoredPosition = new Vector2(0f, -24f);
+                tbr.sizeDelta = new Vector2(-68f, 44f);
+            }
+
+            Transform pBtns = topBar.Find("PathButtonsRow");
+            if (pBtns != null)
+            {
+                RectTransform pbr = pBtns.GetComponent<RectTransform>();
+                if (pbr != null)
+                {
+                    pbr.anchorMin = new Vector2(0f, 0f);
+                    pbr.anchorMax = new Vector2(0.62f, 1f);
+                    pbr.offsetMin = Vector2.zero;
+                    pbr.offsetMax = Vector2.zero;
+                }
+            }
+
+            Transform lustid = topBar.Find("TreeLustidDisplay");
+            if (lustid != null)
+            {
+                RectTransform lr = lustid.GetComponent<RectTransform>();
+                if (lr != null)
+                {
+                    lr.anchorMin = new Vector2(0.62f, 0f);
+                    lr.anchorMax = new Vector2(0.85f, 1f);
+                    lr.offsetMin = new Vector2(10f, 0f);
+                    lr.offsetMax = new Vector2(-15f, 0f);
+                }
+            }
+        }
+
+        // 2. Back button
+        Transform backBtn = pp.Find("BackBtn");
+        if (backBtn != null)
+        {
+            RectTransform br = backBtn.GetComponent<RectTransform>();
+            if (br != null)
+            {
+                br.anchoredPosition = new Vector2(-34f, -24f);
+                br.sizeDelta = new Vector2(170f, 38f);
+            }
+        }
+
+        // 3. TreeNodesArea (Left column)
+        Transform treeLeft = pp.Find("TreeNodesArea");
+        if (treeLeft != null)
+        {
+            RectTransform tlr = treeLeft.GetComponent<RectTransform>();
+            if (tlr != null)
+            {
+                tlr.anchorMin = new Vector2(0f, 0f);
+                tlr.anchorMax = new Vector2(0.63f, 1f);
+                tlr.offsetMin = new Vector2(34f, 28f);
+                tlr.offsetMax = new Vector2(-12f, -82f);
+            }
+        }
+
+        // 4. TreeDetailPanel (Right column)
+        Transform treeRight = pp.Find("TreeDetailPanel");
+        if (treeRight != null)
+        {
+            RectTransform trr = treeRight.GetComponent<RectTransform>();
+            if (trr != null)
+            {
+                trr.anchorMin = new Vector2(0.63f, 0f);
+                trr.anchorMax = new Vector2(1f, 1f);
+                trr.offsetMin = new Vector2(12f, 28f);
+                trr.offsetMax = new Vector2(-34f, -82f);
+            }
+
+            Transform dHead = treeRight.Find("InspectorHeader");
+            if (dHead != null)
+            {
+                RectTransform dhr = dHead.GetComponent<RectTransform>();
+                if (dhr != null) dhr.anchoredPosition = new Vector2(24f, -20f);
+            }
+
+            Transform dTitle = treeRight.Find("NodeTitle");
+            if (dTitle != null)
+            {
+                RectTransform dtr = dTitle.GetComponent<RectTransform>();
+                if (dtr != null) dtr.anchoredPosition = new Vector2(24f, -44f);
+            }
+
+            Transform dCat = treeRight.Find("NodeCategory");
+            if (dCat != null)
+            {
+                RectTransform dcr = dCat.GetComponent<RectTransform>();
+                if (dcr != null) dcr.anchoredPosition = new Vector2(24f, -78f);
+            }
+
+            Transform dDesc = treeRight.Find("Description");
+            if (dDesc != null)
+            {
+                RectTransform ddr = dDesc.GetComponent<RectTransform>();
+                if (ddr != null)
+                {
+                    ddr.anchoredPosition = new Vector2(24f, -112f);
+                    ddr.sizeDelta = new Vector2(-48f, 100f);
+                }
+            }
+
+            Transform dBonus = treeRight.Find("NodeBonuses");
+            if (dBonus != null)
+            {
+                RectTransform dbr = dBonus.GetComponent<RectTransform>();
+                if (dbr != null)
+                {
+                    dbr.offsetMin = new Vector2(24f, 85f);
+                    dbr.offsetMax = new Vector2(-24f, -220f);
+                }
+            }
+
+            Transform awakenBtn = treeRight.Find("Btn_AwakenNode");
+            if (awakenBtn != null)
+            {
+                RectTransform abr = awakenBtn.GetComponent<RectTransform>();
+                if (abr != null)
+                {
+                    abr.anchoredPosition = new Vector2(0f, 26f);
+                    abr.sizeDelta = new Vector2(-52f, 46f);
+                }
+            }
+        }
+    }
+
+    public void ApplyDeckLayoutPaddings()
+    {
+        if (deckOverlay == null) return;
+        Transform dp = deckOverlay.transform.Find("DeckPanel") ?? deckOverlay.transform.Find("DeckbuilderPanel") ?? deckOverlay.transform;
+
+        // 1. Title
+        Transform title = dp.Find("Title");
+        if (title != null)
+        {
+            RectTransform tr = title.GetComponent<RectTransform>();
+            if (tr != null)
+            {
+                tr.anchoredPosition = new Vector2(34f, -22f);
+                tr.sizeDelta = new Vector2(0f, 36f);
+            }
+        }
+
+        // 2. DeckCount
+        Transform count = dp.Find("DeckCount");
+        if (count != null)
+        {
+            RectTransform cr = count.GetComponent<RectTransform>();
+            if (cr != null)
+            {
+                cr.anchoredPosition = new Vector2(-220f, -22f);
+                cr.sizeDelta = new Vector2(0f, 32f);
+            }
+        }
+
+        // 3. BackBtn
+        Transform backBtn = dp.Find("BackBtn");
+        if (backBtn != null)
+        {
+            RectTransform br = backBtn.GetComponent<RectTransform>();
+            if (br != null)
+            {
+                br.anchoredPosition = new Vector2(-34f, -22f);
+                br.sizeDelta = new Vector2(170f, 38f);
+            }
+        }
+
+        // 4. TopCardSelectionSection
+        Transform topSection = dp.Find("TopCardSelectionSection");
+        if (topSection != null)
+        {
+            RectTransform tsr = topSection.GetComponent<RectTransform>();
+            if (tsr != null)
+            {
+                tsr.offsetMin = new Vector2(34f, 12f);
+                tsr.offsetMax = new Vector2(-34f, -72f);
+            }
+
+            Transform detailPanel = topSection.Find("DetailPanel");
+            if (detailPanel != null)
+            {
+                Transform equipBtn = detailPanel.Find("EquipBtn");
+                if (equipBtn != null)
+                {
+                    RectTransform er = equipBtn.GetComponent<RectTransform>();
+                    if (er != null)
+                    {
+                        er.anchoredPosition = new Vector2(0f, 24f);
+                        er.sizeDelta = new Vector2(260f, 46f);
+                    }
+                }
+            }
+        }
+
+        // 5. BottomActiveDeckSection
+        Transform bottomSection = dp.Find("BottomActiveDeckSection");
+        if (bottomSection != null)
+        {
+            RectTransform bsr = bottomSection.GetComponent<RectTransform>();
+            if (bsr != null)
+            {
+                bsr.offsetMin = new Vector2(34f, 26f);
+                bsr.offsetMax = new Vector2(-34f, -8f);
+            }
+        }
+    }
+
+    private void ApplySlicedWoodBg(GameObject panelObj)
+    {
+        if (panelObj == null || woodPanelSprite == null) return;
+        Image img = panelObj.GetComponent<Image>();
+        if (img != null)
+        {
+            img.sprite = woodPanelSprite;
+            img.type = Image.Type.Sliced;
+            img.color = Color.white;
+        }
+        Outline ol = panelObj.GetComponent<Outline>();
+        if (ol != null) ol.enabled = false;
+    }
+
+    private void ApplySlicedWoodSlot(GameObject slotObj)
+    {
+        if (slotObj == null || woodSlotSprite == null) return;
+        Image img = slotObj.GetComponent<Image>();
+        if (img != null)
+        {
+            img.sprite = woodSlotSprite;
+            img.type = Image.Type.Sliced;
+            img.color = Color.white;
+        }
+        Outline ol = slotObj.GetComponent<Outline>();
+        if (ol != null) ol.enabled = false;
+    }
+
+    private void ApplySlicedWoodButton(GameObject btnObj, Color? tint = null)
+    {
+        if (btnObj == null || woodButtonSprite == null) return;
+        Image img = btnObj.GetComponent<Image>();
+        if (img != null)
+        {
+            img.sprite = woodButtonSprite;
+            img.type = Image.Type.Sliced;
+            img.color = tint ?? Color.white;
+        }
+        Outline ol = btnObj.GetComponent<Outline>();
+        if (ol != null) ol.enabled = false;
+
+        Button btn = btnObj.GetComponent<Button>();
+        if (btn != null)
+        {
+            ColorBlock cb = btn.colors;
+            cb.normalColor = tint ?? Color.white;
+            cb.highlightedColor = new Color(1.22f, 1.18f, 1.08f, 1f);
+            cb.pressedColor = new Color(0.70f, 0.65f, 0.60f, 1f);
+            cb.selectedColor = cb.normalColor;
+            cb.disabledColor = new Color(0.40f, 0.40f, 0.40f, 0.50f);
+            cb.colorMultiplier = 1f;
+            btn.colors = cb;
+        }
+    }
+
+    public void ConfigureInteractiveCaveObjects()
+    {
+        // Clean up any old tooltip object if present in hierarchy
+        Transform parent = lobbyPanel != null ? lobbyPanel.transform : transform;
+        Transform oldTooltip = parent.Find("LobbyTooltip");
+        if (oldTooltip != null)
+        {
+            Destroy(oldTooltip.gameObject);
+        }
+
+        if (exitInteractive != null)
+        {
+            exitInteractive.highlightType = LobbyInteractiveObject.HighlightType.SunlightGlow;
+            exitInteractive.hoverBrightness = 1.10f;
+            exitInteractive.glowColor = new Color(1.0f, 0.96f, 0.85f, 0.10f);
+            exitInteractive.outlineWidth = 0f;
+        }
+
+        if (dummyInteractive != null)
+        {
+            dummyInteractive.highlightType = LobbyInteractiveObject.HighlightType.OutlineShader;
+            dummyInteractive.outlineWidth = 2.5f;
+            dummyInteractive.outlineColor = new Color(0.85f, 0.88f, 0.92f, 1f);
+        }
+
+        if (crystalInteractive != null)
+        {
+            crystalInteractive.highlightType = LobbyInteractiveObject.HighlightType.OutlineShader;
+            crystalInteractive.outlineWidth = 2.5f;
+            crystalInteractive.outlineColor = new Color(0.85f, 0.88f, 0.92f, 1f);
+        }
+
+        if (chestInteractive != null)
+        {
+            chestInteractive.highlightType = LobbyInteractiveObject.HighlightType.OutlineShader;
+            chestInteractive.outlineWidth = 2.5f;
+            chestInteractive.outlineColor = new Color(0.85f, 0.88f, 0.92f, 1f);
+        }
+
+        if (settingsInteractive != null)
+        {
+            settingsInteractive.highlightType = LobbyInteractiveObject.HighlightType.OutlineShader;
+            settingsInteractive.outlineWidth = 2.5f;
+            settingsInteractive.outlineColor = new Color(0.85f, 0.88f, 0.92f, 1f);
+        }
     }
 
     private void Start()
     {
+        ConfigureInteractiveCaveObjects();
+        ApplyWoodPanelSkin();
         SetupListeners();
         if (CurrencyManager.Instance != null)
         {
@@ -433,6 +1298,31 @@ public class LobbyUI : MonoBehaviour
             }
         }
 
+        // 3.5 Deck category filter buttons
+        if (filterAllBtn != null)
+        {
+            filterAllBtn.onClick.RemoveAllListeners();
+            filterAllBtn.onClick.AddListener(() => SetDeckCategoryFilter(DeckCategoryFilter.All));
+        }
+
+        if (filterTacticsBtn != null)
+        {
+            filterTacticsBtn.onClick.RemoveAllListeners();
+            filterTacticsBtn.onClick.AddListener(() => SetDeckCategoryFilter(DeckCategoryFilter.WarriorTactics));
+        }
+
+        if (filterLustBtn != null)
+        {
+            filterLustBtn.onClick.RemoveAllListeners();
+            filterLustBtn.onClick.AddListener(() => SetDeckCategoryFilter(DeckCategoryFilter.LustInstincts));
+        }
+
+        if (filterStruggleBtn != null)
+        {
+            filterStruggleBtn.onClick.RemoveAllListeners();
+            filterStruggleBtn.onClick.AddListener(() => SetDeckCategoryFilter(DeckCategoryFilter.StruggleActions));
+        }
+
         // 4. Desire Tree page buttons
         if (treePathPhallusBtn != null)
         {
@@ -500,6 +1390,7 @@ public class LobbyUI : MonoBehaviour
             wardrobeOverlay.SetActive(true);
             currentActiveOverlay = wardrobeOverlay;
         }
+        ApplyWoodPanelSkin();
 
         // Activate PaperDoll on the left side and bring to front of Canvas
         if (paperDoll == null)
@@ -542,6 +1433,7 @@ public class LobbyUI : MonoBehaviour
             deckOverlay.SetActive(true);
             currentActiveOverlay = deckOverlay;
         }
+        ApplyWoodPanelSkin();
         RefreshDeck();
     }
 
@@ -553,6 +1445,7 @@ public class LobbyUI : MonoBehaviour
             pathsOverlay.SetActive(true);
             currentActiveOverlay = pathsOverlay;
         }
+        ApplyWoodPanelSkin();
         RefreshDesireTreeUI();
         if (treeScrollRect != null) treeScrollRect.verticalNormalizedPosition = 0f;
     }
@@ -565,6 +1458,7 @@ public class LobbyUI : MonoBehaviour
             settingsOverlay.SetActive(true);
             currentActiveOverlay = settingsOverlay;
         }
+        ApplyWoodPanelSkin();
         RefreshSettingsUI();
     }
 
@@ -598,6 +1492,32 @@ public class LobbyUI : MonoBehaviour
         if (settingsFullscreenToggleText != null)
         {
             settingsFullscreenToggleText.text = Screen.fullScreen ? "Fullscreen: [ON]" : "Fullscreen: [OFF]";
+        }
+
+        if (settingsOverlay != null)
+        {
+            Transform oldBack = settingsOverlay.transform.Find("SettingsModalCard/ContentArea/SettingsBackBtn");
+            if (oldBack != null)
+            {
+                Destroy(oldBack.gameObject);
+            }
+            Transform card = settingsOverlay.transform.Find("SettingsModalCard");
+            if (card != null)
+            {
+                RectTransform crt = card.GetComponent<RectTransform>();
+                if (crt != null && crt.sizeDelta.y > 350f)
+                {
+                    crt.sizeDelta = new Vector2(580f, 340f);
+                }
+            }
+            if (settingsMainMenuBtn != null)
+            {
+                RectTransform mmrt = settingsMainMenuBtn.GetComponent<RectTransform>();
+                if (mmrt != null)
+                {
+                    mmrt.anchoredPosition = new Vector2(0f, 15f);
+                }
+            }
         }
     }
 
@@ -736,6 +1656,7 @@ public class LobbyUI : MonoBehaviour
 
     public void RefreshWardrobe()
     {
+        ApplyWoodPanelSkin();
         if (characterState == null) return;
 
         ItemData equippedUpper = characterState.GetEquippedItem(EquipSlot.UpperClothes);
@@ -794,22 +1715,45 @@ public class LobbyUI : MonoBehaviour
 
                 if (bodySizeButtonBgs != null && i < bodySizeButtonBgs.Length && bodySizeButtonBgs[i] != null)
                 {
-                    if (active)
-                        bodySizeButtonBgs[i].color = new Color(0.75f, 0.25f, 0.65f, 1f);
-                    else if (unlocked)
-                        bodySizeButtonBgs[i].color = new Color(0.18f, 0.22f, 0.30f, 0.90f);
+                    if (woodButtonSprite != null)
+                    {
+                        bodySizeButtonBgs[i].sprite = woodButtonSprite;
+                        bodySizeButtonBgs[i].type = Image.Type.Sliced;
+                        if (active)
+                            bodySizeButtonBgs[i].color = new Color(1.25f, 1.15f, 0.95f, 1f);
+                        else if (unlocked)
+                            bodySizeButtonBgs[i].color = new Color(0.70f, 0.68f, 0.65f, 1f);
+                        else
+                            bodySizeButtonBgs[i].color = new Color(0.35f, 0.33f, 0.32f, 0.50f);
+                    }
                     else
-                        bodySizeButtonBgs[i].color = new Color(0.10f, 0.12f, 0.16f, 0.50f);
+                    {
+                        if (active)
+                            bodySizeButtonBgs[i].color = new Color(0.75f, 0.25f, 0.65f, 1f);
+                        else if (unlocked)
+                            bodySizeButtonBgs[i].color = new Color(0.18f, 0.22f, 0.30f, 0.90f);
+                        else
+                            bodySizeButtonBgs[i].color = new Color(0.10f, 0.12f, 0.16f, 0.50f);
+                    }
                 }
 
                 if (bodySizeButtonTexts != null && i < bodySizeButtonTexts.Length && bodySizeButtonTexts[i] != null)
                 {
                     if (active)
+                    {
                         bodySizeButtonTexts[i].text = $"[ACTIVE] {sizeLabels[i]}";
+                        bodySizeButtonTexts[i].color = new Color(1.0f, 0.92f, 0.60f, 1f);
+                    }
                     else if (unlocked)
+                    {
                         bodySizeButtonTexts[i].text = sizeLabels[i];
+                        bodySizeButtonTexts[i].color = new Color(0.90f, 0.88f, 0.82f, 1f);
+                    }
                     else
+                    {
                         bodySizeButtonTexts[i].text = $"[LOCKED] {sizeLabels[i]}";
+                        bodySizeButtonTexts[i].color = new Color(0.55f, 0.52f, 0.48f, 1f);
+                    }
                 }
             }
         }
@@ -845,10 +1789,22 @@ public class LobbyUI : MonoBehaviour
 
                 if (emotionButtonBgs != null && i < emotionButtonBgs.Length && emotionButtonBgs[i] != null)
                 {
-                    if (active)
-                        emotionButtonBgs[i].color = new Color(0.75f, 0.25f, 0.65f, 1f);
+                    if (woodButtonSprite != null)
+                    {
+                        emotionButtonBgs[i].sprite = woodButtonSprite;
+                        emotionButtonBgs[i].type = Image.Type.Sliced;
+                        if (active)
+                            emotionButtonBgs[i].color = new Color(1.25f, 1.15f, 0.95f, 1f);
+                        else
+                            emotionButtonBgs[i].color = new Color(0.70f, 0.68f, 0.65f, 1f);
+                    }
                     else
-                        emotionButtonBgs[i].color = new Color(0.18f, 0.22f, 0.30f, 0.90f);
+                    {
+                        if (active)
+                            emotionButtonBgs[i].color = new Color(0.75f, 0.25f, 0.65f, 1f);
+                        else
+                            emotionButtonBgs[i].color = new Color(0.18f, 0.22f, 0.30f, 0.90f);
+                    }
                 }
 
                 if (emotionButtonTexts != null && i < emotionButtonTexts.Length && emotionButtonTexts[i] != null)
@@ -858,6 +1814,7 @@ public class LobbyUI : MonoBehaviour
                     else if (label.Equals("shocked", StringComparison.OrdinalIgnoreCase)) label = "Shocked";
 
                     emotionButtonTexts[i].text = active ? $"[{label}]" : label;
+                    emotionButtonTexts[i].color = active ? new Color(1.0f, 0.92f, 0.60f, 1f) : new Color(0.85f, 0.82f, 0.75f, 1f);
                 }
             }
         }
@@ -884,18 +1841,31 @@ public class LobbyUI : MonoBehaviour
         row.transform.SetParent(wardrobeItemsContainer, false);
 
         RectTransform rr = row.GetComponent<RectTransform>();
-        rr.sizeDelta = new Vector2(0f, 48f);
+        rr.sizeDelta = new Vector2(0f, 116f);
+
+        if (woodSlotSprite == null)
+        {
+            woodSlotSprite = LoadUISprite("ui_slot_wood.png");
+        }
 
         Image bg = row.AddComponent<Image>();
-        bg.color = isEquipped ? new Color(0.18f, 0.22f, 0.30f, 0.90f) : new Color(0.12f, 0.14f, 0.18f, 0.85f);
+        if (woodSlotSprite != null)
+        {
+            bg.sprite = woodSlotSprite;
+            bg.type = Image.Type.Sliced;
+            bg.color = isEquipped ? new Color(1.1f, 1.05f, 0.95f, 1f) : new Color(0.92f, 0.92f, 0.92f, 1f);
+        }
+        else
+        {
+            bg.color = isEquipped ? new Color(0.18f, 0.22f, 0.30f, 0.90f) : new Color(0.12f, 0.14f, 0.18f, 0.85f);
+        }
 
-        HorizontalLayoutGroup hlg = row.AddComponent<HorizontalLayoutGroup>();
-        hlg.padding = new RectOffset(16, 16, 4, 4);
-        hlg.spacing = 12;
-        hlg.childControlWidth = false;
-        hlg.childControlHeight = true;
-        hlg.childForceExpandWidth = false;
-        hlg.childForceExpandHeight = true;
+        if (isEquipped)
+        {
+            Outline ol = row.AddComponent<Outline>();
+            ol.effectColor = new Color(0.85f, 0.70f, 0.35f, 0.70f);
+            ol.effectDistance = new Vector2(1.5f, -1.5f);
+        }
 
         string slotLabel = item.IsCombinedArmor ? "Combined Armor" : (item.IsUpperArmor ? "Upper Armor" : (item.IsLowerArmor ? "Lower Armor" : item.equipSlot.ToString()));
         var statsList = new List<string>();
@@ -909,31 +1879,66 @@ public class LobbyUI : MonoBehaviour
 
         GameObject nameObj = new GameObject("Name", typeof(RectTransform));
         nameObj.transform.SetParent(row.transform, false);
+        RectTransform namert = nameObj.GetComponent<RectTransform>();
+        namert.anchorMin = Vector2.zero;
+        namert.anchorMax = Vector2.one;
+        namert.offsetMin = new Vector2(32f, 0f);
+        namert.offsetMax = new Vector2(-210f, 0f);
+
         TextMeshProUGUI nameTxt = nameObj.AddComponent<TextMeshProUGUI>();
         nameTxt.text = $"{item.itemName} ({slotLabel}) [{statsSummary}]";
         nameTxt.fontSize = 17;
         nameTxt.alignment = TextAlignmentOptions.MidlineLeft;
-        nameTxt.color = Color.white;
+        nameTxt.color = isEquipped ? new Color(1.0f, 0.92f, 0.70f, 1f) : Color.white;
         nameTxt.raycastTarget = false;
-        nameObj.GetComponent<RectTransform>().sizeDelta = new Vector2(460f, 0f);
 
         GameObject btnObj = new GameObject("EquipBtn", typeof(RectTransform));
         btnObj.transform.SetParent(row.transform, false);
+        RectTransform brt = btnObj.GetComponent<RectTransform>();
+        brt.anchorMin = new Vector2(1f, 0.5f);
+        brt.anchorMax = new Vector2(1f, 0.5f);
+        brt.pivot = new Vector2(1f, 0.5f);
+        brt.anchoredPosition = new Vector2(-28f, 0f);
+        brt.sizeDelta = new Vector2(160f, 44f);
+
         Image btnBg = btnObj.AddComponent<Image>();
-        btnBg.color = isEquipped ? new Color(0.55f, 0.25f, 0.25f, 1f) : new Color(0.25f, 0.55f, 0.35f, 1f);
+
+        if (woodButtonSprite == null)
+        {
+            woodButtonSprite = LoadUISprite("ui_button.png");
+        }
+
+        if (woodProgressFrameSprite == null)
+        {
+            woodProgressFrameSprite = LoadUISprite("ui_progressbar_frame.png");
+        }
+
+        if (woodButtonSprite != null)
+        {
+            btnBg.sprite = woodButtonSprite;
+            btnBg.type = Image.Type.Sliced;
+            btnBg.color = isEquipped ? new Color(0.92f, 0.65f, 0.65f, 1f) : new Color(0.75f, 0.95f, 0.80f, 1f);
+        }
+        else
+        {
+            btnBg.color = isEquipped ? new Color(0.55f, 0.25f, 0.25f, 1f) : new Color(0.25f, 0.55f, 0.35f, 1f);
+        }
 
         Button btn = btnObj.AddComponent<Button>();
         btn.targetGraphic = btnBg;
-        btnObj.GetComponent<RectTransform>().sizeDelta = new Vector2(160f, 40f);
+        ColorBlock btnCb = btn.colors;
+        btnCb.highlightedColor = new Color(1.22f, 1.18f, 1.08f, 1f);
+        btnCb.pressedColor = new Color(0.70f, 0.65f, 0.60f, 1f);
+        btn.colors = btnCb;
 
         GameObject btnTxtObj = new GameObject("Text", typeof(RectTransform));
         btnTxtObj.transform.SetParent(btnObj.transform, false);
         TextMeshProUGUI btnTxt = btnTxtObj.AddComponent<TextMeshProUGUI>();
         btnTxt.text = isEquipped ? "Unequip" : "Equip";
-        btnTxt.fontSize = 17;
+        btnTxt.fontSize = 16;
         btnTxt.fontStyle = FontStyles.Bold;
         btnTxt.alignment = TextAlignmentOptions.Center;
-        btnTxt.color = Color.white;
+        btnTxt.color = isEquipped ? new Color(1f, 0.88f, 0.88f, 1f) : new Color(0.90f, 1f, 0.90f, 1f);
         btnTxt.raycastTarget = false;
 
         RectTransform btr = btnTxtObj.GetComponent<RectTransform>();
@@ -965,10 +1970,22 @@ public class LobbyUI : MonoBehaviour
 
     public void UpdateFilterButtonsUI()
     {
-        Color activeBg = new Color(0.68f, 0.54f, 0.28f, 0.95f);
-        Color inactiveBg = new Color(0.12f, 0.14f, 0.18f, 0.85f);
-        Color activeTxt = Color.white;
-        Color inactiveTxt = new Color(0.70f, 0.72f, 0.78f, 1f);
+        if (woodButtonSprite == null) woodButtonSprite = LoadUISprite("ui_button.png");
+
+        Color activeBg = (woodButtonSprite != null) ? new Color(1.25f, 1.15f, 0.95f, 1f) : new Color(0.68f, 0.54f, 0.28f, 0.95f);
+        Color inactiveBg = (woodButtonSprite != null) ? new Color(0.65f, 0.65f, 0.65f, 1f) : new Color(0.12f, 0.14f, 0.18f, 0.85f);
+        Color activeTxt = new Color(1.0f, 0.92f, 0.65f, 1f);
+        Color inactiveTxt = new Color(0.85f, 0.82f, 0.75f, 1f);
+
+        Image[] bgs = { filterAllBg, filterTacticsBg, filterLustBg, filterStruggleBg };
+        foreach (var bg in bgs)
+        {
+            if (bg != null && woodButtonSprite != null && bg.sprite != woodButtonSprite)
+            {
+                bg.sprite = woodButtonSprite;
+                bg.type = Image.Type.Sliced;
+            }
+        }
 
         if (filterAllBg != null) filterAllBg.color = (currentDeckCategoryFilter == DeckCategoryFilter.All) ? activeBg : inactiveBg;
         if (filterAllText != null) filterAllText.color = (currentDeckCategoryFilter == DeckCategoryFilter.All) ? activeTxt : inactiveTxt;
@@ -1222,23 +2239,42 @@ public class LobbyUI : MonoBehaviour
 
                 bool isDeckFull = (CombatManager.Instance != null && CombatManager.Instance.baseWarriorDeck.Count >= CombatManager.MAX_DECK_SIZE);
 
+                if (woodButtonSprite == null) woodButtonSprite = LoadUISprite("ui_button.png");
+                if (detailEquipBtnBg != null && woodButtonSprite != null && detailEquipBtnBg.sprite != woodButtonSprite)
+                {
+                    detailEquipBtnBg.sprite = woodButtonSprite;
+                    detailEquipBtnBg.type = Image.Type.Sliced;
+                }
+
                 if (isAlreadyInDeck)
                 {
                     detailEquipBtn.interactable = false;
-                    if (detailEquipBtnText != null) detailEquipBtnText.text = "EQUIPPED IN DECK";
-                    if (detailEquipBtnBg != null) detailEquipBtnBg.color = new Color(0.35f, 0.35f, 0.35f, 0.6f);
+                    if (detailEquipBtnText != null)
+                    {
+                        detailEquipBtnText.text = "EQUIPPED IN DECK";
+                        detailEquipBtnText.color = new Color(0.65f, 0.65f, 0.65f, 1f);
+                    }
+                    if (detailEquipBtnBg != null) detailEquipBtnBg.color = (woodButtonSprite != null) ? new Color(0.35f, 0.33f, 0.32f, 0.5f) : new Color(0.35f, 0.35f, 0.35f, 0.6f);
                 }
                 else if (isDeckFull)
                 {
                     detailEquipBtn.interactable = false;
-                    if (detailEquipBtnText != null) detailEquipBtnText.text = "DECK FULL (9/9)";
-                    if (detailEquipBtnBg != null) detailEquipBtnBg.color = new Color(0.35f, 0.35f, 0.35f, 0.6f);
+                    if (detailEquipBtnText != null)
+                    {
+                        detailEquipBtnText.text = "DECK FULL (9/9)";
+                        detailEquipBtnText.color = new Color(0.65f, 0.65f, 0.65f, 1f);
+                    }
+                    if (detailEquipBtnBg != null) detailEquipBtnBg.color = (woodButtonSprite != null) ? new Color(0.35f, 0.33f, 0.32f, 0.5f) : new Color(0.35f, 0.35f, 0.35f, 0.6f);
                 }
                 else
                 {
                     detailEquipBtn.interactable = true;
-                    if (detailEquipBtnText != null) detailEquipBtnText.text = "ADD TO DECK";
-                    if (detailEquipBtnBg != null) detailEquipBtnBg.color = new Color(0.22f, 0.55f, 0.35f, 1f);
+                    if (detailEquipBtnText != null)
+                    {
+                        detailEquipBtnText.text = "ADD TO DECK";
+                        detailEquipBtnText.color = new Color(0.92f, 1.0f, 0.92f, 1f);
+                    }
+                    if (detailEquipBtnBg != null) detailEquipBtnBg.color = (woodButtonSprite != null) ? new Color(0.78f, 0.95f, 0.80f, 1f) : new Color(0.22f, 0.55f, 0.35f, 1f);
                 }
             }
         }
@@ -1301,6 +2337,9 @@ public class LobbyUI : MonoBehaviour
         bool isSelected,
         Action onClick)
     {
+        var dtm = DesireTreeManager.Instance ?? DesireTreeManager.EnsureExists();
+        bool isTreeLocked = (card.category == CardCategory.LustInstinct && !dtm.IsCardUnlocked(card.id));
+
         GameObject cardObj = new GameObject($"Card_{card.id}", typeof(RectTransform));
         cardObj.transform.SetParent(parent, false);
 
@@ -1352,22 +2391,53 @@ public class LobbyUI : MonoBehaviour
         GameObject bgObj = new GameObject("Background", typeof(RectTransform));
         bgObj.transform.SetParent(cardObj.transform, false);
         Image bg = bgObj.AddComponent<Image>();
-        bg.color = Color.black;
-        bg.raycastTarget = false;
         RectTransform bgrt = bgObj.GetComponent<RectTransform>();
         bgrt.anchorMin = Vector2.zero;
         bgrt.anchorMax = Vector2.one;
         bgrt.offsetMin = Vector2.zero;
         bgrt.offsetMax = Vector2.zero;
 
+        if (cardFrameSprite == null)
+        {
+            cardFrameSprite = LoadUISprite("ui_card_frame.png");
+        }
+
+        if (cardFrameSprite != null)
+        {
+            bg.sprite = cardFrameSprite;
+            bg.color = isTreeLocked ? new Color(0.55f, 0.55f, 0.60f, 1f) : Color.white;
+            restingBorderObj.SetActive(false);
+        }
+        else
+        {
+            bg.color = Color.black;
+            restingBorderObj.SetActive(true);
+        }
+        bg.raycastTarget = false;
+
         GameObject artWindow = new GameObject("ArtWindow", typeof(RectTransform));
         artWindow.transform.SetParent(cardObj.transform, false);
         artWindow.AddComponent<RectMask2D>();
         RectTransform winRt = artWindow.GetComponent<RectTransform>();
-        winRt.anchorMin = Vector2.zero;
-        winRt.anchorMax = Vector2.one;
-        winRt.offsetMin = new Vector2(3f, 27f);
-        winRt.offsetMax = new Vector2(-3f, -3f);
+
+        if (cardFrameSprite != null)
+        {
+            winRt.anchorMin = new Vector2(0.06f, 0.33f);
+            winRt.anchorMax = new Vector2(0.94f, 0.94f);
+            winRt.offsetMin = Vector2.zero;
+            winRt.offsetMax = Vector2.zero;
+
+            Image winBg = artWindow.AddComponent<Image>();
+            winBg.color = new Color(0.05f, 0.05f, 0.07f, 1f);
+            winBg.raycastTarget = false;
+        }
+        else
+        {
+            winRt.anchorMin = Vector2.zero;
+            winRt.anchorMax = Vector2.one;
+            winRt.offsetMin = new Vector2(3f, 27f);
+            winRt.offsetMax = new Vector2(-3f, -3f);
+        }
 
         GameObject artObj = new GameObject("Art", typeof(RectTransform));
         artObj.transform.SetParent(artWindow.transform, false);
@@ -1375,14 +2445,10 @@ public class LobbyUI : MonoBehaviour
         artImg.preserveAspect = true;
         artImg.raycastTarget = false;
         RectTransform artRt = artObj.GetComponent<RectTransform>();
-        artRt.anchorMin = new Vector2(0.5f, 0.5f);
-        artRt.anchorMax = new Vector2(0.5f, 0.5f);
-        artRt.pivot = new Vector2(0.5f, 0.5f);
-        artRt.anchoredPosition = Vector2.zero;
-        artRt.sizeDelta = new Vector2(size.y * 1.83f, size.y);
-
-        var dtm = DesireTreeManager.Instance ?? DesireTreeManager.EnsureExists();
-        bool isTreeLocked = (card.category == CardCategory.LustInstinct && !dtm.IsCardUnlocked(card.id));
+        artRt.anchorMin = Vector2.zero;
+        artRt.anchorMax = Vector2.one;
+        artRt.offsetMin = Vector2.zero;
+        artRt.offsetMax = Vector2.zero;
 
         Sprite art = card.cardArt != null ? card.cardArt : SkillArtDatabase.GetSkillSprite(card.id);
         if (art != null)
@@ -1406,25 +2472,40 @@ public class LobbyUI : MonoBehaviour
         sepRt.pivot = new Vector2(0.5f, 0f);
         sepRt.anchoredPosition = new Vector2(0f, 25f);
         sepRt.sizeDelta = new Vector2(0f, 1.5f);
+        sepObj.SetActive(cardFrameSprite == null);
 
         GameObject namePlate = new GameObject("NamePlate", typeof(RectTransform));
         namePlate.transform.SetParent(cardObj.transform, false);
         Image nameBg = namePlate.AddComponent<Image>();
-        nameBg.color = new Color(0.04f, 0.04f, 0.06f, 1f);
         nameBg.raycastTarget = false;
         RectTransform nprt = namePlate.GetComponent<RectTransform>();
-        nprt.anchorMin = new Vector2(0f, 0f);
-        nprt.anchorMax = new Vector2(1f, 0f);
-        nprt.pivot = new Vector2(0.5f, 0f);
-        nprt.anchoredPosition = Vector2.zero;
-        nprt.sizeDelta = new Vector2(0f, 26f);
+
+        if (cardFrameSprite != null)
+        {
+            nameBg.color = Color.clear;
+            nprt.anchorMin = new Vector2(0.14f, 0.08f);
+            nprt.anchorMax = new Vector2(0.86f, 0.28f);
+            nprt.offsetMin = Vector2.zero;
+            nprt.offsetMax = Vector2.zero;
+        }
+        else
+        {
+            nameBg.color = new Color(0.04f, 0.04f, 0.06f, 1f);
+            nprt.anchorMin = new Vector2(0f, 0f);
+            nprt.anchorMax = new Vector2(1f, 0f);
+            nprt.pivot = new Vector2(0.5f, 0f);
+            nprt.anchoredPosition = Vector2.zero;
+            nprt.sizeDelta = new Vector2(0f, 26f);
+        }
 
         GameObject nameTxtObj = new GameObject("Text", typeof(RectTransform));
         nameTxtObj.transform.SetParent(namePlate.transform, false);
         TextMeshProUGUI nameTxt = nameTxtObj.AddComponent<TextMeshProUGUI>();
-        nameTxt.text = isTreeLocked ? $"{card.cardName}\n<size=8><color=#8895B0>[LOCKED]</color></size>" : card.cardName;
-        nameTxt.fontSize = isTreeLocked ? 10 : 12;
-        nameTxt.lineSpacing = -10;
+        nameTxt.text = isTreeLocked ? $"{card.cardName}\n<size=7><color=#8895B0>[LOCKED]</color></size>" : card.cardName;
+        nameTxt.enableAutoSizing = true;
+        nameTxt.fontSizeMin = 7f;
+        nameTxt.fontSizeMax = isTreeLocked ? 9.5f : 11f;
+        nameTxt.lineSpacing = -8;
         nameTxt.fontStyle = FontStyles.Bold;
         nameTxt.alignment = TextAlignmentOptions.Center;
         nameTxt.color = isTreeLocked ? new Color(0.70f, 0.72f, 0.80f, 0.90f) : new Color(0.96f, 0.94f, 0.90f, 1f);
@@ -1437,14 +2518,14 @@ public class LobbyUI : MonoBehaviour
         GameObject apBadge = new GameObject("ApBadge", typeof(RectTransform));
         apBadge.transform.SetParent(cardObj.transform, false);
         Image apRim = apBadge.AddComponent<Image>();
-        apRim.color = new Color(0.35f, 0.26f, 0.10f, 1f);
+        apRim.color = borderTint;
         apRim.raycastTarget = false;
         RectTransform aprt = apBadge.GetComponent<RectTransform>();
         aprt.anchorMin = new Vector2(0f, 1f);
         aprt.anchorMax = new Vector2(0f, 1f);
         aprt.pivot = new Vector2(0f, 1f);
-        aprt.anchoredPosition = new Vector2(4f, -4f);
-        aprt.sizeDelta = new Vector2(24f, 24f);
+        aprt.anchoredPosition = new Vector2(3f, -3f);
+        aprt.sizeDelta = new Vector2(22f, 22f);
 
         GameObject apInner = new GameObject("Inner", typeof(RectTransform));
         apInner.transform.SetParent(apBadge.transform, false);
@@ -1499,7 +2580,7 @@ public class LobbyUI : MonoBehaviour
             GameObject crossTxtObj = new GameObject("Text", typeof(RectTransform));
             crossTxtObj.transform.SetParent(unequipObj.transform, false);
             TextMeshProUGUI crossTxt = crossTxtObj.AddComponent<TextMeshProUGUI>();
-            crossTxt.text = "✕";
+            crossTxt.text = "X";
             crossTxt.fontSize = 15;
             crossTxt.fontStyle = FontStyles.Bold;
             crossTxt.alignment = TextAlignmentOptions.Center;
@@ -1528,6 +2609,11 @@ public class LobbyUI : MonoBehaviour
         RectTransform srt = slotObj.GetComponent<RectTransform>();
         srt.sizeDelta = size;
 
+        if (woodSlotSprite == null)
+        {
+            woodSlotSprite = LoadUISprite("ui_slot_wood.png");
+        }
+
         GameObject borderObj = new GameObject("Border", typeof(RectTransform));
         borderObj.transform.SetParent(slotObj.transform, false);
         Image bImg = borderObj.AddComponent<Image>();
@@ -1542,7 +2628,17 @@ public class LobbyUI : MonoBehaviour
         GameObject bgObj = new GameObject("Bg", typeof(RectTransform));
         bgObj.transform.SetParent(slotObj.transform, false);
         Image bg = bgObj.AddComponent<Image>();
-        bg.color = new Color(0.06f, 0.08f, 0.11f, 0.45f);
+        if (woodSlotSprite != null)
+        {
+            bg.sprite = woodSlotSprite;
+            bg.type = Image.Type.Sliced;
+            bg.color = new Color(0.75f, 0.75f, 0.75f, 0.85f);
+            bImg.enabled = false;
+        }
+        else
+        {
+            bg.color = new Color(0.06f, 0.08f, 0.11f, 0.45f);
+        }
         bg.raycastTarget = false;
         RectTransform bgrt = bgObj.GetComponent<RectTransform>();
         bgrt.anchorMin = Vector2.zero;
@@ -1658,11 +2754,23 @@ public class LobbyUI : MonoBehaviour
             ? CombatManager.Instance.activeLustPath 
             : (LustPathType)PlayerPrefs.GetInt("Sanctum_ActiveLustPath", (int)LustPathType.PhallusDevotee);
 
-        Color activeGold = new Color(0.95f, 0.85f, 0.35f, 1f);
-        Color selectedTabBg = new Color(0.35f, 0.18f, 0.42f, 0.95f);
-        Color normalBg = new Color(0.12f, 0.14f, 0.18f, 0.85f);
-        Color normalText = new Color(0.75f, 0.78f, 0.85f, 1f);
-        Color lockedText = new Color(0.50f, 0.52f, 0.58f, 1f);
+        if (woodButtonSprite == null) woodButtonSprite = LoadUISprite("ui_button.png");
+
+        Color activeGold = new Color(1.0f, 0.92f, 0.60f, 1f);
+        Color selectedTabBg = (woodButtonSprite != null) ? new Color(1.25f, 1.15f, 0.95f, 1f) : new Color(0.35f, 0.18f, 0.42f, 0.95f);
+        Color normalBg = (woodButtonSprite != null) ? new Color(0.65f, 0.65f, 0.65f, 1f) : new Color(0.12f, 0.14f, 0.18f, 0.85f);
+        Color normalText = new Color(0.85f, 0.82f, 0.75f, 1f);
+        Color lockedText = new Color(0.55f, 0.52f, 0.48f, 1f);
+
+        Image[] tabBgs = { treePathPhallusBg, treePathBoundBg, treePathMonsterBg };
+        foreach (var bg in tabBgs)
+        {
+            if (bg != null && woodButtonSprite != null && bg.sprite != woodButtonSprite)
+            {
+                bg.sprite = woodButtonSprite;
+                bg.type = Image.Type.Sliced;
+            }
+        }
 
         bool isPhallusViewed = selectedTreePath == LustPathType.PhallusDevotee;
         bool isBoundViewed = selectedTreePath == LustPathType.BoundSubmissive;
@@ -1742,17 +2850,21 @@ public class LobbyUI : MonoBehaviour
         {
             foreach (Transform child in treeNodesScrollContent) Destroy(child.gameObject);
 
+            TMP_FontAsset baseFont = (lustidBadgeText != null && lustidBadgeText.font != null)
+                ? lustidBadgeText.font
+                : (treeDetailTitleText != null ? treeDetailTitleText.font : null);
+
             var nodes = dtm.GetNodesForPath(selectedTreePath);
             if (nodes.Count > 0 && selectedTreeNode == null)
             {
                 selectedTreeNode = nodes[0];
             }
 
-            CreateTierDivider(treeNodesScrollContent, 68f, "TIER I: AWAKENING INSTINCTS", new Color(0.95f, 0.80f, 0.40f, 0.25f));
-            CreateTierDivider(treeNodesScrollContent, 360f, "TIER II: DEEP PLEASURE & UNION", new Color(0.85f, 0.45f, 0.90f, 0.25f));
-            CreateTierDivider(treeNodesScrollContent, 660f, "TIER III: APEX CORRUPTION & DEVOTION", new Color(1f, 0.85f, 0.40f, 0.35f));
+            CreateTierDivider(treeNodesScrollContent, 68f, "TIER I: AWAKENING INSTINCTS", new Color(0.95f, 0.80f, 0.40f, 0.25f), baseFont);
+            CreateTierDivider(treeNodesScrollContent, 360f, "TIER II: DEEP PLEASURE & UNION", new Color(0.85f, 0.45f, 0.90f, 0.25f), baseFont);
+            CreateTierDivider(treeNodesScrollContent, 660f, "TIER III: APEX CORRUPTION & DEVOTION", new Color(1f, 0.85f, 0.40f, 0.35f), baseFont);
 
-            CreateSubBranchHeaders(treeNodesScrollContent, selectedTreePath);
+            CreateSubBranchHeaders(treeNodesScrollContent, selectedTreePath, baseFont);
 
             foreach (var node in nodes)
             {
@@ -1765,7 +2877,7 @@ public class LobbyUI : MonoBehaviour
 
             foreach (var node in nodes)
             {
-                CreateTreeNodeCircle(treeNodesScrollContent, node, node == selectedTreeNode);
+                CreateTreeNodeCircle(treeNodesScrollContent, node, node == selectedTreeNode, baseFont);
             }
         }
 
@@ -1775,7 +2887,7 @@ public class LobbyUI : MonoBehaviour
         }
     }
 
-    private void CreateTierDivider(Transform parent, float yPos, string label, Color color)
+    private void CreateTierDivider(Transform parent, float yPos, string label, Color color, TMP_FontAsset baseFont = null)
     {
         GameObject divObj = new GameObject($"TierDivider_{yPos}", typeof(RectTransform));
         divObj.transform.SetParent(parent, false);
@@ -1816,6 +2928,7 @@ public class LobbyUI : MonoBehaviour
         trt.sizeDelta = Vector2.zero;
 
         TextMeshProUGUI tt = textObj.AddComponent<TextMeshProUGUI>();
+        if (baseFont != null) tt.font = baseFont;
         tt.text = $"— {label} —";
         tt.fontSize = 10f;
         tt.fontStyle = FontStyles.Bold;
@@ -1824,7 +2937,7 @@ public class LobbyUI : MonoBehaviour
         tt.raycastTarget = false;
     }
 
-    private void CreateSubBranchHeaders(Transform parent, LustPathType path)
+    private void CreateSubBranchHeaders(Transform parent, LustPathType path, TMP_FontAsset baseFont = null)
     {
         string subA = "SUB-A";
         string subB = "SUB-B";
@@ -1849,12 +2962,12 @@ public class LobbyUI : MonoBehaviour
                 break;
         }
 
-        CreateSubHeaderBadge(parent, -130f, 30f, subA);
-        CreateSubHeaderBadge(parent, 0f, 30f, subB);
-        CreateSubHeaderBadge(parent, 130f, 30f, subC);
+        CreateSubHeaderBadge(parent, -130f, 30f, subA, baseFont);
+        CreateSubHeaderBadge(parent, 0f, 30f, subB, baseFont);
+        CreateSubHeaderBadge(parent, 130f, 30f, subC, baseFont);
     }
 
-    private void CreateSubHeaderBadge(Transform parent, float xPos, float yPos, string text)
+    private void CreateSubHeaderBadge(Transform parent, float xPos, float yPos, string text, TMP_FontAsset baseFont = null)
     {
         GameObject badge = new GameObject($"ColHeader_{xPos}", typeof(RectTransform));
         badge.transform.SetParent(parent, false);
@@ -1877,6 +2990,7 @@ public class LobbyUI : MonoBehaviour
         trt.sizeDelta = Vector2.zero;
 
         TextMeshProUGUI tmp = txtObj.AddComponent<TextMeshProUGUI>();
+        if (baseFont != null) tmp.font = baseFont;
         tmp.text = text;
         tmp.fontSize = 8.5f;
         tmp.lineSpacing = -10f;
@@ -1926,7 +3040,7 @@ public class LobbyUI : MonoBehaviour
         }
     }
 
-    private void CreateTreeNodeCircle(Transform parent, DesireTreeNode node, bool isSelected)
+    private void CreateTreeNodeCircle(Transform parent, DesireTreeNode node, bool isSelected, TMP_FontAsset baseFont = null)
     {
         var dtm = DesireTreeManager.Instance ?? DesireTreeManager.EnsureExists();
         bool isUnlocked = dtm.IsNodeUnlocked(node.id);
@@ -2019,6 +3133,7 @@ public class LobbyUI : MonoBehaviour
         irt.anchorMax = Vector2.one;
         irt.sizeDelta = Vector2.zero;
         TextMeshProUGUI itxt = iconObj.AddComponent<TextMeshProUGUI>();
+        if (baseFont != null) itxt.font = baseFont;
         itxt.alignment = TextAlignmentOptions.Center;
         itxt.raycastTarget = false;
 
@@ -2054,6 +3169,7 @@ public class LobbyUI : MonoBehaviour
         lbrt.sizeDelta = new Vector2(140f, 32f);
 
         TextMeshProUGUI lbtxt = labelObj.AddComponent<TextMeshProUGUI>();
+        if (baseFont != null) lbtxt.font = baseFont;
         lbtxt.alignment = TextAlignmentOptions.Top;
         lbtxt.fontSize = 10f;
         lbtxt.lineSpacing = -15f;
@@ -2068,7 +3184,7 @@ public class LobbyUI : MonoBehaviour
         else if (node.lustidCost == 0)
             costBadge = "<color=#40D0FF>FREE</color>";
         else
-            costBadge = canUnlock ? $"<color=#FF77DD>✦ {node.lustidCost}</color>" : $"<color=#777D90>[LOCKED] {node.lustidCost}</color>";
+            costBadge = canUnlock ? $"<color=#FF77DD>* {node.lustidCost}</color>" : $"<color=#777D90>[LOCKED] {node.lustidCost}</color>";
 
         lbtxt.text = $"<color={titleColor}>{node.title}</color>\n{costBadge}";
     }
@@ -2129,24 +3245,31 @@ public class LobbyUI : MonoBehaviour
         {
             treePurchaseBtn.onClick.RemoveAllListeners();
 
+            if (woodButtonSprite == null) woodButtonSprite = LoadUISprite("ui_button.png");
+            if (treePurchaseBtnBg != null && woodButtonSprite != null && treePurchaseBtnBg.sprite != woodButtonSprite)
+            {
+                treePurchaseBtnBg.sprite = woodButtonSprite;
+                treePurchaseBtnBg.type = Image.Type.Sliced;
+            }
+
             if (selectedTreePath != activePath)
             {
                 treePurchaseBtn.interactable = false;
                 if (treePurchaseBtnText != null) treePurchaseBtnText.text = "[SELECT PATH FIRST]";
-                if (treePurchaseBtnBg != null) treePurchaseBtnBg.color = new Color(0.25f, 0.25f, 0.30f, 0.70f);
+                if (treePurchaseBtnBg != null) treePurchaseBtnBg.color = (woodButtonSprite != null) ? new Color(0.35f, 0.33f, 0.32f, 0.6f) : new Color(0.25f, 0.25f, 0.30f, 0.70f);
             }
             else if (isUnlocked)
             {
                 treePurchaseBtn.interactable = false;
                 if (treePurchaseBtnText != null) treePurchaseBtnText.text = "[MASTERED]";
-                if (treePurchaseBtnBg != null) treePurchaseBtnBg.color = new Color(0.20f, 0.45f, 0.25f, 0.85f);
+                if (treePurchaseBtnBg != null) treePurchaseBtnBg.color = (woodButtonSprite != null) ? new Color(0.60f, 0.75f, 0.60f, 0.85f) : new Color(0.20f, 0.45f, 0.25f, 0.85f);
             }
             else if (canUnlock)
             {
                 treePurchaseBtn.interactable = true;
                 string costLabel = node.lustidCost > 0 ? $"UNLOCK ({node.lustidCost} LUSTID)" : "AWAKEN (FREE)";
                 if (treePurchaseBtnText != null) treePurchaseBtnText.text = costLabel;
-                if (treePurchaseBtnBg != null) treePurchaseBtnBg.color = new Color(0.65f, 0.22f, 0.60f, 1f);
+                if (treePurchaseBtnBg != null) treePurchaseBtnBg.color = (woodButtonSprite != null) ? new Color(0.78f, 0.95f, 0.80f, 1f) : new Color(0.65f, 0.22f, 0.60f, 1f);
 
                 treePurchaseBtn.onClick.AddListener(() =>
                 {
@@ -2172,7 +3295,7 @@ public class LobbyUI : MonoBehaviour
                 {
                     if (treePurchaseBtnText != null) treePurchaseBtnText.text = $"NEED {node.lustidCost} LUSTID (Have {currentLustid})";
                 }
-                if (treePurchaseBtnBg != null) treePurchaseBtnBg.color = new Color(0.25f, 0.25f, 0.30f, 0.7f);
+                if (treePurchaseBtnBg != null) treePurchaseBtnBg.color = (woodButtonSprite != null) ? new Color(0.35f, 0.33f, 0.32f, 0.6f) : new Color(0.25f, 0.25f, 0.30f, 0.7f);
             }
         }
     }
@@ -2309,6 +3432,8 @@ public class LobbyUI : MonoBehaviour
         // 5. Wardrobe Chest (Foreground)
         lobby.chestInteractive = createInteractiveLayer("Layer_Chest", lobby.chestSprite, 5);
 
+        lobby.ConfigureInteractiveCaveObjects();
+
         // 3. Lustid Currency Badge (Top Right HUD)
         GameObject lustidBadgeObj = new GameObject("LustidBadge", typeof(RectTransform));
         lustidBadgeObj.transform.SetParent(caveView.transform, false);
@@ -2443,11 +3568,11 @@ public class LobbyUI : MonoBehaviour
         wtr2.anchorMin = new Vector2(0f, 1f);
         wtr2.anchorMax = new Vector2(0.7f, 1f);
         wtr2.pivot = new Vector2(0f, 1f);
-        wtr2.anchoredPosition = new Vector2(25f, -12f);
-        wtr2.sizeDelta = new Vector2(0f, 40f);
+        wtr2.anchoredPosition = new Vector2(32f, -22f);
+        wtr2.sizeDelta = new Vector2(0f, 36f);
 
         // Close / Back to Cave Button
-        lobby.wardrobeCloseBtn = CreateOverlayBackButton(wPanel.transform, "✕ BACK TO CAVE", () => lobby.CloseActiveOverlay());
+        lobby.wardrobeCloseBtn = CreateOverlayBackButton(wPanel.transform, "BACK TO CAVE", () => lobby.CloseActiveOverlay());
 
         // Equipped Clothes Box
         GameObject eqBox = new GameObject("EquippedBox", typeof(RectTransform));
@@ -2458,21 +3583,21 @@ public class LobbyUI : MonoBehaviour
         eqr.anchorMin = new Vector2(0f, 1f);
         eqr.anchorMax = new Vector2(1f, 1f);
         eqr.pivot = new Vector2(0.5f, 1f);
-        eqr.anchoredPosition = new Vector2(0f, -60f);
-        eqr.sizeDelta = new Vector2(-50f, 56f);
+        eqr.anchoredPosition = new Vector2(0f, -68f);
+        eqr.sizeDelta = new Vector2(-56f, 62f);
 
         GameObject eqTxtObj = new GameObject("Text", typeof(RectTransform));
         eqTxtObj.transform.SetParent(eqBox.transform, false);
         TextMeshProUGUI eqTxt = eqTxtObj.AddComponent<TextMeshProUGUI>();
         eqTxt.text = "Equipped Clothes: None";
-        eqTxt.fontSize = 17;
+        eqTxt.fontSize = 16;
         eqTxt.alignment = TextAlignmentOptions.MidlineLeft;
         eqTxt.color = new Color(0.92f, 0.88f, 0.75f, 1f);
         RectTransform eqtr = eqTxtObj.GetComponent<RectTransform>();
         eqtr.anchorMin = new Vector2(0f, 0f);
         eqtr.anchorMax = new Vector2(0.68f, 1f);
-        eqtr.anchoredPosition = new Vector2(16f, 0f);
-        eqtr.sizeDelta = new Vector2(-16f, 0f);
+        eqtr.anchoredPosition = new Vector2(24f, 0f);
+        eqtr.sizeDelta = new Vector2(-24f, 0f);
         lobby.equippedClothesText = eqTxt;
 
         // Unequip (Strip) Button
@@ -2486,13 +3611,13 @@ public class LobbyUI : MonoBehaviour
         ubr.anchorMin = new Vector2(1f, 0.5f);
         ubr.anchorMax = new Vector2(1f, 0.5f);
         ubr.pivot = new Vector2(1f, 0.5f);
-        ubr.anchoredPosition = new Vector2(-12f, 0f);
-        ubr.sizeDelta = new Vector2(105f, 38f);
+        ubr.anchoredPosition = new Vector2(-20f, 0f);
+        ubr.sizeDelta = new Vector2(100f, 34f);
         GameObject uTxt = new GameObject("Text", typeof(RectTransform));
         uTxt.transform.SetParent(uBtnObj.transform, false);
         TextMeshProUGUI utxr = uTxt.AddComponent<TextMeshProUGUI>();
         utxr.text = "Strip";
-        utxr.fontSize = 16;
+        utxr.fontSize = 15;
         utxr.fontStyle = FontStyles.Bold;
         utxr.alignment = TextAlignmentOptions.Center;
         utxr.color = Color.white;
@@ -2513,8 +3638,8 @@ public class LobbyUI : MonoBehaviour
         rbr.anchorMin = new Vector2(1f, 0.5f);
         rbr.anchorMax = new Vector2(1f, 0.5f);
         rbr.pivot = new Vector2(1f, 0.5f);
-        rbr.anchoredPosition = new Vector2(-125f, 0f);
-        rbr.sizeDelta = new Vector2(120f, 38f);
+        rbr.anchoredPosition = new Vector2(-128f, 0f);
+        rbr.sizeDelta = new Vector2(120f, 34f);
         GameObject rTxt = new GameObject("Text", typeof(RectTransform));
         rTxt.transform.SetParent(rBtnObj.transform, false);
         TextMeshProUGUI rtxr = rTxt.AddComponent<TextMeshProUGUI>();
@@ -2538,8 +3663,8 @@ public class LobbyUI : MonoBehaviour
         stbr.anchorMin = new Vector2(0f, 1f);
         stbr.anchorMax = new Vector2(1f, 1f);
         stbr.pivot = new Vector2(0.5f, 1f);
-        stbr.anchoredPosition = new Vector2(0f, -125f);
-        stbr.sizeDelta = new Vector2(-50f, 115f);
+        stbr.anchoredPosition = new Vector2(0f, -140f);
+        stbr.sizeDelta = new Vector2(-56f, 132f);
         lobby.fleshStabilizationContainer = stabBox;
 
         GameObject stTitleObj = new GameObject("StabTitle", typeof(RectTransform));
@@ -2548,8 +3673,8 @@ public class LobbyUI : MonoBehaviour
         sttr.anchorMin = new Vector2(0f, 1f);
         sttr.anchorMax = new Vector2(1f, 1f);
         sttr.pivot = new Vector2(0.5f, 1f);
-        sttr.anchoredPosition = new Vector2(15f, -8f);
-        sttr.sizeDelta = new Vector2(-30f, 22f);
+        sttr.anchoredPosition = new Vector2(24f, -14f);
+        sttr.sizeDelta = new Vector2(-48f, 22f);
         TextMeshProUGUI stTitle = stTitleObj.AddComponent<TextMeshProUGUI>();
         stTitle.text = "FLESH STABILIZATION (Choose Unlocked Anatomy)";
         stTitle.fontSize = 13;
@@ -2563,8 +3688,8 @@ public class LobbyUI : MonoBehaviour
         brr.anchorMin = new Vector2(0f, 1f);
         brr.anchorMax = new Vector2(1f, 1f);
         brr.pivot = new Vector2(0.5f, 1f);
-        brr.anchoredPosition = new Vector2(0f, -34f);
-        brr.sizeDelta = new Vector2(-20f, 36f);
+        brr.anchoredPosition = new Vector2(0f, -42f);
+        brr.sizeDelta = new Vector2(-48f, 36f);
         HorizontalLayoutGroup brHlg = btnRow.AddComponent<HorizontalLayoutGroup>();
         brHlg.spacing = 10;
         brHlg.childControlWidth = true;
@@ -2607,10 +3732,10 @@ public class LobbyUI : MonoBehaviour
         infor.anchorMin = new Vector2(0f, 0f);
         infor.anchorMax = new Vector2(1f, 0f);
         infor.pivot = new Vector2(0.5f, 0f);
-        infor.anchoredPosition = new Vector2(0f, 6f);
-        infor.sizeDelta = new Vector2(-20f, 32f);
+        infor.anchoredPosition = new Vector2(0f, 14f);
+        infor.sizeDelta = new Vector2(-48f, 32f);
         HorizontalLayoutGroup infHlg = infoRow.AddComponent<HorizontalLayoutGroup>();
-        infHlg.spacing = 10;
+        infHlg.spacing = 12;
         infHlg.childControlWidth = false;
         infHlg.childControlHeight = true;
 
@@ -2627,7 +3752,7 @@ public class LobbyUI : MonoBehaviour
         GameObject dbgBtnObj = new GameObject("DbgFillBtn", typeof(RectTransform));
         dbgBtnObj.transform.SetParent(infoRow.transform, false);
         RectTransform dbgrt = dbgBtnObj.GetComponent<RectTransform>();
-        dbgrt.sizeDelta = new Vector2(120f, 28f);
+        dbgrt.sizeDelta = new Vector2(120f, 30f);
         Image dbgBg = dbgBtnObj.AddComponent<Image>();
         dbgBg.color = new Color(0.55f, 0.20f, 0.45f, 0.95f);
         Button dbgBtn = dbgBtnObj.AddComponent<Button>();
@@ -2666,8 +3791,8 @@ public class LobbyUI : MonoBehaviour
         emor.anchorMin = new Vector2(0f, 1f);
         emor.anchorMax = new Vector2(1f, 1f);
         emor.pivot = new Vector2(0.5f, 1f);
-        emor.anchoredPosition = new Vector2(0f, -250f);
-        emor.sizeDelta = new Vector2(-50f, 72f);
+        emor.anchoredPosition = new Vector2(0f, -282f);
+        emor.sizeDelta = new Vector2(-56f, 84f);
         lobby.emotionContainer = emoBox;
 
         GameObject emoTitleObj = new GameObject("EmoTitle", typeof(RectTransform));
@@ -2676,8 +3801,8 @@ public class LobbyUI : MonoBehaviour
         emotr.anchorMin = new Vector2(0f, 1f);
         emotr.anchorMax = new Vector2(1f, 1f);
         emotr.pivot = new Vector2(0.5f, 1f);
-        emotr.anchoredPosition = new Vector2(15f, -6f);
-        emotr.sizeDelta = new Vector2(-30f, 20f);
+        emotr.anchoredPosition = new Vector2(24f, -12f);
+        emotr.sizeDelta = new Vector2(-48f, 20f);
         TextMeshProUGUI emoTitle = emoTitleObj.AddComponent<TextMeshProUGUI>();
         emoTitle.text = "FACIAL EXPRESSION";
         emoTitle.fontSize = 12;
@@ -2690,8 +3815,8 @@ public class LobbyUI : MonoBehaviour
         RectTransform ebrr = emoBtnRow.GetComponent<RectTransform>();
         ebrr.anchorMin = new Vector2(0f, 0f);
         ebrr.anchorMax = new Vector2(1f, 1f);
-        ebrr.offsetMin = new Vector2(10f, 8f);
-        ebrr.offsetMax = new Vector2(-10f, -26f);
+        ebrr.offsetMin = new Vector2(24f, 10f);
+        ebrr.offsetMax = new Vector2(-24f, -32f);
         HorizontalLayoutGroup emoHlg = emoBtnRow.AddComponent<HorizontalLayoutGroup>();
         emoHlg.spacing = 8;
         emoHlg.childControlWidth = true;
@@ -2735,8 +3860,8 @@ public class LobbyUI : MonoBehaviour
         scr.anchorMin = new Vector2(0f, 0f);
         scr.anchorMax = new Vector2(1f, 1f);
         scr.pivot = new Vector2(0.5f, 1f);
-        scr.offsetMax = new Vector2(-25f, -332f);
-        scr.offsetMin = new Vector2(25f, 15f);
+        scr.offsetMax = new Vector2(-28f, -378f);
+        scr.offsetMin = new Vector2(28f, 25f);
 
         ScrollRect sRect = scrollObj.AddComponent<ScrollRect>();
         sRect.horizontal = false;
@@ -2823,7 +3948,7 @@ public class LobbyUI : MonoBehaviour
         dtr2.anchorMin = new Vector2(0f, 1f);
         dtr2.anchorMax = new Vector2(0.5f, 1f);
         dtr2.pivot = new Vector2(0f, 1f);
-        dtr2.anchoredPosition = new Vector2(25f, -12f);
+        dtr2.anchoredPosition = new Vector2(34f, -22f);
         dtr2.sizeDelta = new Vector2(0f, 36f);
 
         GameObject dCountObj = new GameObject("DeckCount", typeof(RectTransform));
@@ -2838,11 +3963,11 @@ public class LobbyUI : MonoBehaviour
         dcr.anchorMin = new Vector2(0.4f, 1f);
         dcr.anchorMax = new Vector2(0.85f, 1f);
         dcr.pivot = new Vector2(1f, 1f);
-        dcr.anchoredPosition = new Vector2(-20f, -14f);
+        dcr.anchoredPosition = new Vector2(-220f, -22f);
         dcr.sizeDelta = new Vector2(0f, 32f);
         lobby.deckCountText = dCount;
 
-        lobby.deckCloseBtn = CreateOverlayBackButton(dPanel.transform, "✕ BACK TO CAVE", () => lobby.CloseActiveOverlay());
+        lobby.deckCloseBtn = CreateOverlayBackButton(dPanel.transform, "BACK TO CAVE", () => lobby.CloseActiveOverlay());
 
         // Top Section: Collection Grid & Detail Panel
         GameObject topSectionObj = new GameObject("TopCardSelectionSection", typeof(RectTransform));
@@ -2850,8 +3975,8 @@ public class LobbyUI : MonoBehaviour
         RectTransform tsrt = topSectionObj.GetComponent<RectTransform>();
         tsrt.anchorMin = new Vector2(0f, 0.30f);
         tsrt.anchorMax = new Vector2(1f, 1f);
-        tsrt.offsetMin = new Vector2(25f, 10f);
-        tsrt.offsetMax = new Vector2(-25f, -54f);
+        tsrt.offsetMin = new Vector2(34f, 12f);
+        tsrt.offsetMax = new Vector2(-34f, -72f);
 
         // Top-Left: Collection Area (~66% width)
         GameObject leftColObj = new GameObject("CollectionArea", typeof(RectTransform));
@@ -3100,8 +4225,8 @@ public class LobbyUI : MonoBehaviour
         deprt.anchorMin = new Vector2(0.5f, 0f);
         deprt.anchorMax = new Vector2(0.5f, 0f);
         deprt.pivot = new Vector2(0.5f, 0f);
-        deprt.anchoredPosition = new Vector2(0f, 16f);
-        deprt.sizeDelta = new Vector2(260f, 48f);
+        deprt.anchoredPosition = new Vector2(0f, 24f);
+        deprt.sizeDelta = new Vector2(260f, 46f);
         lobby.detailEquipBtn = dEquipBtn;
         lobby.detailEquipBtnBg = dEquipBg;
 
@@ -3136,8 +4261,8 @@ public class LobbyUI : MonoBehaviour
         RectTransform bsrt = bottomSecObj.GetComponent<RectTransform>();
         bsrt.anchorMin = new Vector2(0f, 0f);
         bsrt.anchorMax = new Vector2(1f, 0.30f);
-        bsrt.offsetMin = new Vector2(25f, 12f);
-        bsrt.offsetMax = new Vector2(-25f, -6f);
+        bsrt.offsetMin = new Vector2(34f, 26f);
+        bsrt.offsetMax = new Vector2(-34f, -8f);
 
         GameObject actHead = new GameObject("ActiveHeader", typeof(RectTransform));
         actHead.transform.SetParent(bottomSecObj.transform, false);
@@ -3242,8 +4367,8 @@ public class LobbyUI : MonoBehaviour
         p4tbRt.anchorMin = new Vector2(0f, 1f);
         p4tbRt.anchorMax = new Vector2(1f, 1f);
         p4tbRt.pivot = new Vector2(0.5f, 1f);
-        p4tbRt.anchoredPosition = new Vector2(0f, -12f);
-        p4tbRt.sizeDelta = new Vector2(-40f, 48f);
+        p4tbRt.anchoredPosition = new Vector2(0f, -24f);
+        p4tbRt.sizeDelta = new Vector2(-68f, 44f);
 
         GameObject p4BtnsRow = new GameObject("PathButtonsRow", typeof(RectTransform));
         p4BtnsRow.transform.SetParent(p4TopBar.transform, false);
@@ -3308,16 +4433,16 @@ public class LobbyUI : MonoBehaviour
         p4lt.color = Color.white;
         lobby.treeHeaderLustidText = p4lt;
 
-        lobby.pathsCloseBtn = CreateOverlayBackButton(pPanel.transform, "✕ BACK TO CAVE", () => lobby.CloseActiveOverlay());
+        lobby.pathsCloseBtn = CreateOverlayBackButton(pPanel.transform, "BACK TO CAVE", () => lobby.CloseActiveOverlay());
 
-        // Left Column: Tree Nodes Scroll View (~64% width)
+        // Left Column: Tree Nodes Scroll View (~63% width)
         GameObject treeLeftObj = new GameObject("TreeNodesArea", typeof(RectTransform));
         treeLeftObj.transform.SetParent(pPanel.transform, false);
         RectTransform tlaRt = treeLeftObj.GetComponent<RectTransform>();
         tlaRt.anchorMin = new Vector2(0f, 0f);
-        tlaRt.anchorMax = new Vector2(0.64f, 1f);
-        tlaRt.offsetMin = new Vector2(25f, 20f);
-        tlaRt.offsetMax = new Vector2(-10f, -70f);
+        tlaRt.anchorMax = new Vector2(0.63f, 1f);
+        tlaRt.offsetMin = new Vector2(34f, 28f);
+        tlaRt.offsetMax = new Vector2(-12f, -82f);
 
         Image tlaBg = treeLeftObj.AddComponent<Image>();
         tlaBg.color = new Color(0.08f, 0.09f, 0.12f, 0.90f);
@@ -3462,14 +4587,14 @@ public class LobbyUI : MonoBehaviour
         lobby.treeOverlaySelectBtnBg = tobBg;
         lobby.treeOverlaySelectBtnText = tobtTxt;
 
-        // Right Column: Node Detail / Awakening Inspector (~36% width)
+        // Right Column: Node Detail / Awakening Inspector (~37% width)
         GameObject treeRightObj = new GameObject("TreeDetailPanel", typeof(RectTransform));
         treeRightObj.transform.SetParent(pPanel.transform, false);
         RectTransform traRt = treeRightObj.GetComponent<RectTransform>();
-        traRt.anchorMin = new Vector2(0.64f, 0f);
+        traRt.anchorMin = new Vector2(0.63f, 0f);
         traRt.anchorMax = new Vector2(1f, 1f);
-        traRt.offsetMin = new Vector2(10f, 20f);
-        traRt.offsetMax = new Vector2(-25f, -70f);
+        traRt.offsetMin = new Vector2(12f, 28f);
+        traRt.offsetMax = new Vector2(-34f, -82f);
 
         Image traBg = treeRightObj.AddComponent<Image>();
         traBg.color = new Color(0.12f, 0.09f, 0.16f, 0.98f);
@@ -3555,8 +4680,8 @@ public class LobbyUI : MonoBehaviour
         pbrRt2.anchorMin = new Vector2(0f, 0f);
         pbrRt2.anchorMax = new Vector2(1f, 0f);
         pbrRt2.pivot = new Vector2(0.5f, 0f);
-        pbrRt2.anchoredPosition = new Vector2(0f, 16f);
-        pbrRt2.sizeDelta = new Vector2(-36f, 48f);
+        pbrRt2.anchoredPosition = new Vector2(0f, 26f);
+        pbrRt2.sizeDelta = new Vector2(-52f, 46f);
 
         Image pbrBg = pBuyObj.AddComponent<Image>();
         pbrBg.color = new Color(0.65f, 0.22f, 0.60f, 1f);
@@ -3603,14 +4728,14 @@ public class LobbyUI : MonoBehaviour
         sdImg.color = new Color(0.02f, 0.03f, 0.06f, 0.75f);
         sdImg.raycastTarget = true;
 
-        // Settings Modal Card (Centered, 580x420)
+        // Settings Modal Card (Centered, 600x360)
         GameObject sPanel = new GameObject("SettingsModalCard", typeof(RectTransform));
         sPanel.transform.SetParent(settingsOverlayObj.transform, false);
         RectTransform sprt = sPanel.GetComponent<RectTransform>();
         sprt.anchorMin = new Vector2(0.5f, 0.5f);
         sprt.anchorMax = new Vector2(0.5f, 0.5f);
         sprt.pivot = new Vector2(0.5f, 0.5f);
-        sprt.sizeDelta = new Vector2(580f, 420f);
+        sprt.sizeDelta = new Vector2(600f, 360f);
 
         Image spBg = sPanel.AddComponent<Image>();
         spBg.color = new Color(0.08f, 0.09f, 0.13f, 0.98f);
@@ -3630,8 +4755,8 @@ public class LobbyUI : MonoBehaviour
         strt2.anchorMin = new Vector2(0f, 1f);
         strt2.anchorMax = new Vector2(1f, 1f);
         strt2.pivot = new Vector2(0f, 1f);
-        strt2.anchoredPosition = new Vector2(25f, -14f);
-        strt2.sizeDelta = new Vector2(-50f, 32f);
+        strt2.anchoredPosition = new Vector2(32f, -22f);
+        strt2.sizeDelta = new Vector2(-120f, 32f);
 
         // Close X button
         GameObject xBtnObj = new GameObject("CloseXBtn", typeof(RectTransform));
@@ -3640,8 +4765,8 @@ public class LobbyUI : MonoBehaviour
         xrt.anchorMin = new Vector2(1f, 1f);
         xrt.anchorMax = new Vector2(1f, 1f);
         xrt.pivot = new Vector2(1f, 1f);
-        xrt.anchoredPosition = new Vector2(-15f, -12f);
-        xrt.sizeDelta = new Vector2(36f, 36f);
+        xrt.anchoredPosition = new Vector2(-26f, -20f);
+        xrt.sizeDelta = new Vector2(38f, 38f);
         Image xBg = xBtnObj.AddComponent<Image>();
         xBg.color = new Color(0.20f, 0.15f, 0.20f, 0.85f);
         Button xBtn = xBtnObj.AddComponent<Button>();
@@ -3651,7 +4776,7 @@ public class LobbyUI : MonoBehaviour
         GameObject xTxtObj = new GameObject("Text", typeof(RectTransform));
         xTxtObj.transform.SetParent(xBtnObj.transform, false);
         TextMeshProUGUI xTxt = xTxtObj.AddComponent<TextMeshProUGUI>();
-        xTxt.text = "✕";
+        xTxt.text = "X";
         xTxt.fontSize = 18;
         xTxt.fontStyle = FontStyles.Bold;
         xTxt.alignment = TextAlignmentOptions.Center;
@@ -3667,8 +4792,8 @@ public class LobbyUI : MonoBehaviour
         RectTransform scrt = sContent.GetComponent<RectTransform>();
         scrt.anchorMin = new Vector2(0f, 0f);
         scrt.anchorMax = new Vector2(1f, 1f);
-        scrt.offsetMin = new Vector2(30f, 25f);
-        scrt.offsetMax = new Vector2(-30f, -60f);
+        scrt.offsetMin = new Vector2(36f, 30f);
+        scrt.offsetMax = new Vector2(-36f, -70f);
 
         // 1. Master Volume Label
         GameObject volLabelObj = new GameObject("VolumeLabel", typeof(RectTransform));
@@ -3734,8 +4859,8 @@ public class LobbyUI : MonoBehaviour
         RectTransform slhart = slHandleArea.GetComponent<RectTransform>();
         slhart.anchorMin = Vector2.zero;
         slhart.anchorMax = Vector2.one;
-        slhart.offsetMin = new Vector2(10f, 0f);
-        slhart.offsetMax = new Vector2(-10f, 0f);
+        slhart.offsetMin = new Vector2(14f, 0f);
+        slhart.offsetMax = new Vector2(-14f, 0f);
 
         GameObject slHandle = new GameObject("Handle", typeof(RectTransform));
         slHandle.transform.SetParent(slHandleArea.transform, false);
@@ -3754,7 +4879,7 @@ public class LobbyUI : MonoBehaviour
         fsrt.anchorMin = new Vector2(0f, 1f);
         fsrt.anchorMax = new Vector2(1f, 1f);
         fsrt.pivot = new Vector2(0.5f, 1f);
-        fsrt.anchoredPosition = new Vector2(0f, -100f);
+        fsrt.anchoredPosition = new Vector2(0f, -96f);
         fsrt.sizeDelta = new Vector2(0f, 44f);
         Image fsBg = fsBtnObj.AddComponent<Image>();
         fsBg.color = new Color(0.16f, 0.20f, 0.28f, 0.95f);
@@ -3783,8 +4908,8 @@ public class LobbyUI : MonoBehaviour
         mmrt.anchorMin = new Vector2(0f, 0f);
         mmrt.anchorMax = new Vector2(1f, 0f);
         mmrt.pivot = new Vector2(0.5f, 0f);
-        mmrt.anchoredPosition = new Vector2(0f, 58f);
-        mmrt.sizeDelta = new Vector2(0f, 46f);
+        mmrt.anchoredPosition = new Vector2(0f, 8f);
+        mmrt.sizeDelta = new Vector2(0f, 44f);
         Image mmBg = mmBtnObj.AddComponent<Image>();
         mmBg.color = new Color(0.55f, 0.20f, 0.25f, 0.95f);
         Button mmBtn = mmBtnObj.AddComponent<Button>();
@@ -3803,34 +4928,6 @@ public class LobbyUI : MonoBehaviour
         mmtrt.anchorMin = Vector2.zero;
         mmtrt.anchorMax = Vector2.one;
         mmtrt.sizeDelta = Vector2.zero;
-
-        // 4. Back / Close Button (Emerald Green)
-        GameObject sCloseBtnObj = new GameObject("SettingsBackBtn", typeof(RectTransform));
-        sCloseBtnObj.transform.SetParent(sContent.transform, false);
-        RectTransform scbrt = sCloseBtnObj.GetComponent<RectTransform>();
-        scbrt.anchorMin = new Vector2(0f, 0f);
-        scbrt.anchorMax = new Vector2(1f, 0f);
-        scbrt.pivot = new Vector2(0.5f, 0f);
-        scbrt.anchoredPosition = new Vector2(0f, 4f);
-        scbrt.sizeDelta = new Vector2(0f, 44f);
-        Image scbBg = sCloseBtnObj.AddComponent<Image>();
-        scbBg.color = new Color(0.22f, 0.55f, 0.35f, 1f);
-        Button scbBtn = sCloseBtnObj.AddComponent<Button>();
-        scbBtn.targetGraphic = scbBg;
-        scbBtn.onClick.AddListener(() => lobby.CloseActiveOverlay());
-
-        GameObject scbTxtObj = new GameObject("Text", typeof(RectTransform));
-        scbTxtObj.transform.SetParent(sCloseBtnObj.transform, false);
-        TextMeshProUGUI scbTxt = scbTxtObj.AddComponent<TextMeshProUGUI>();
-        scbTxt.text = "BACK TO CAVE";
-        scbTxt.fontSize = 16;
-        scbTxt.fontStyle = FontStyles.Bold;
-        scbTxt.alignment = TextAlignmentOptions.Center;
-        scbTxt.color = Color.white;
-        RectTransform scbtrt = scbTxtObj.GetComponent<RectTransform>();
-        scbtrt.anchorMin = Vector2.zero;
-        scbtrt.anchorMax = Vector2.one;
-        scbtrt.sizeDelta = Vector2.zero;
 
         // Hide all overlays initially
         if (wardrobeOverlay != null) wardrobeOverlay.SetActive(false);
@@ -3851,13 +4948,28 @@ public class LobbyUI : MonoBehaviour
         rt.sizeDelta = new Vector2(180f, 40f);
 
         Image bg = btnObj.AddComponent<Image>();
-        bg.color = new Color(0.22f, 0.16f, 0.24f, 0.95f);
-        Outline outline = btnObj.AddComponent<Outline>();
-        outline.effectColor = new Color(0.85f, 0.45f, 0.70f, 0.85f);
-        outline.effectDistance = new Vector2(1.5f, -1.5f);
+        Sprite wBtn = LoadUISprite("ui_button.png");
+        if (wBtn != null)
+        {
+            bg.sprite = wBtn;
+            bg.type = Image.Type.Sliced;
+            bg.color = Color.white;
+        }
+        else
+        {
+            bg.color = new Color(0.22f, 0.16f, 0.24f, 0.95f);
+            Outline outline = btnObj.AddComponent<Outline>();
+            outline.effectColor = new Color(0.85f, 0.45f, 0.70f, 0.85f);
+            outline.effectDistance = new Vector2(1.5f, -1.5f);
+        }
 
         Button btn = btnObj.AddComponent<Button>();
         btn.targetGraphic = bg;
+        ColorBlock cb = btn.colors;
+        cb.highlightedColor = new Color(1.22f, 1.18f, 1.08f, 1f);
+        cb.pressedColor = new Color(0.70f, 0.65f, 0.60f, 1f);
+        btn.colors = cb;
+
         if (onClick != null)
         {
             btn.onClick.AddListener(() => onClick.Invoke());
@@ -3875,7 +4987,7 @@ public class LobbyUI : MonoBehaviour
         txt.fontSize = 15;
         txt.fontStyle = FontStyles.Bold;
         txt.alignment = TextAlignmentOptions.Center;
-        txt.color = new Color(1f, 0.92f, 0.96f, 1f);
+        txt.color = new Color(0.92f, 0.88f, 0.78f, 1f);
         txt.raycastTarget = false;
 
         return btn;
