@@ -62,6 +62,10 @@ namespace UnbridledSanctum.Combat
         public int persistentMaxUpperClothesHp = 65;
         public int persistentLowerClothesHp = 65;
         public int persistentMaxLowerClothesHp = 65;
+        public int persistentUnderUpperClothesHp = 35;
+        public int persistentMaxUnderUpperClothesHp = 35;
+        public int persistentUnderLowerClothesHp = 35;
+        public int persistentMaxUnderLowerClothesHp = 35;
 
         public bool IsWearingCombinedClothes
         {
@@ -90,6 +94,32 @@ namespace UnbridledSanctum.Combat
         public List<CardInstance> equippedDeck { get; private set; } = new List<CardInstance>();
         public List<CardData> baseWarriorDeck { get; private set; } = new List<CardData>();
         public int persistentSemenVolumeMl = 0;
+        public int persistentSemenMouthMl = 0;
+        public const int MAX_SEMEN_MOUTH_ML = 100;
+        public int persistentSemenWombMl = 0;
+        public const int MAX_SEMEN_WOMB_ML = 200;
+        public int persistentSemenAnalMl = 0;
+        public const int MAX_SEMEN_ANAL_ML = 150;
+
+        public void AddPersistentSemen(int amountMl, PenetrationSlot slot = PenetrationSlot.None)
+        {
+            if (amountMl <= 0) return;
+            persistentSemenVolumeMl += amountMl;
+            switch (slot)
+            {
+                case PenetrationSlot.Mouth:
+                    persistentSemenMouthMl = Mathf.Min(MAX_SEMEN_MOUTH_ML, persistentSemenMouthMl + amountMl);
+                    break;
+                case PenetrationSlot.Anal:
+                    persistentSemenAnalMl = Mathf.Min(MAX_SEMEN_ANAL_ML, persistentSemenAnalMl + amountMl);
+                    break;
+                case PenetrationSlot.Vagina:
+                default:
+                    persistentSemenWombMl = Mathf.Min(MAX_SEMEN_WOMB_ML, persistentSemenWombMl + amountMl);
+                    break;
+            }
+            OnPersistentStatsChanged?.Invoke();
+        }
         public ExternalFinishZone activeControlZone = ExternalFinishZone.None;
         private Dictionary<string, int> cardCooldowns = new Dictionary<string, int>();
 
@@ -362,6 +392,51 @@ namespace UnbridledSanctum.Combat
             return enemies.Find(e => e != null && !e.isDefeated && e.occupiedSlot == slot);
         }
 
+        public Combatant GetGrapplingEnemy(GrappleZone zone = GrappleZone.None)
+        {
+            if (enemies == null) return null;
+            if (zone == GrappleZone.None)
+                return enemies.Find(e => e != null && !e.isDefeated && e.isGrapplingPlayer);
+            return enemies.Find(e => e != null && !e.isDefeated && e.isGrapplingPlayer && e.heldGrappleZone == zone);
+        }
+
+        public bool IsGrappleOccupied(GrappleZone zone = GrappleZone.None)
+        {
+            return GetGrapplingEnemy(zone) != null;
+        }
+
+        public bool CanGrapple(Combatant enemy, GrappleZone zone = GrappleZone.None)
+        {
+            if (enemy == null || enemy.isDefeated) return false;
+            if (enemy.isGrapplingPlayer && (zone == GrappleZone.None || enemy.heldGrappleZone == zone)) return true;
+            return !IsGrappleOccupied(zone);
+        }
+
+        public bool AssignGrapple(Combatant enemy, GrappleZone zone = GrappleZone.None)
+        {
+            if (enemy == null || enemy.isDefeated) return false;
+            if (enemy.isGrapplingPlayer && (zone == GrappleZone.None || enemy.heldGrappleZone == zone)) return true;
+
+            var existing = GetGrapplingEnemy(zone);
+            if (existing != null && existing != enemy)
+            {
+                string zoneTag = zone == GrappleZone.Upper ? "face and upper body" : "thighs and lower body";
+                OnCombatLogMessage?.Invoke($"{enemy.name} attempts to pin you, but {existing.name} is already locking your {zoneTag}!");
+                return false;
+            }
+
+            enemy.isGrapplingPlayer = true;
+            enemy.heldGrappleZone = (zone != GrappleZone.None) ? zone : GrappleZone.Lower;
+            enemy.occupiedSlot = PenetrationSlot.None;
+            TransitionStance(CombatStance.Grappled);
+
+            string zoneLog = enemy.heldGrappleZone == GrappleZone.Upper 
+                ? $"{enemy.name} pins your head and face with her hands and weight! [Face Grapple -> Oral Path]" 
+                : $"{enemy.name} scissor-locks her thighs tightly around your waist and legs! [Thigh Grapple -> Vaginal Path]";
+            OnCombatLogMessage?.Invoke(zoneLog);
+            return true;
+        }
+
         public bool CanPenetrateSlot(Combatant enemy, PenetrationSlot slot)
         {
             if (enemy == null || !enemy.canPenetrate || slot == PenetrationSlot.None) return false;
@@ -404,21 +479,20 @@ namespace UnbridledSanctum.Combat
             if (enemy == null || slot == PenetrationSlot.None) return;
             if (!enemy.canPenetrate)
             {
-                enemy.isGrapplingPlayer = true;
-                TransitionStance(CombatStance.Grappled);
+                AssignGrapple(enemy);
                 return;
             }
 
             if (IsSlotOccupied(slot))
             {
                 OnCombatLogMessage?.Invoke($"Your {slot.ToString().ToUpper()} is already occupied! {enemy.name} cannot enter!");
-                enemy.isGrapplingPlayer = true;
-                TransitionStance(CombatStance.Grappled);
+                AssignGrapple(enemy);
                 return;
             }
 
             enemy.occupiedSlot = slot;
             enemy.isGrapplingPlayer = false;
+            enemy.heldGrappleZone = GrappleZone.None;
             TransitionStance(CombatStance.Penetrated);
             OnCombatLogMessage?.Invoke($"{enemy.name} forcefully penetrates your vessel's {slot.ToString().ToUpper()}! [Slot Claimed]");
         }
@@ -431,6 +505,7 @@ namespace UnbridledSanctum.Combat
 
             enemy.occupiedSlot = PenetrationSlot.None;
             enemy.isGrapplingPlayer = false;
+            enemy.heldGrappleZone = GrappleZone.None;
 
             if (prevSlot != PenetrationSlot.None)
             {
@@ -454,6 +529,7 @@ namespace UnbridledSanctum.Combat
                     {
                         e.occupiedSlot = PenetrationSlot.None;
                         e.isGrapplingPlayer = false;
+                        e.heldGrappleZone = GrappleZone.None;
                     }
                 }
             }
@@ -882,6 +958,20 @@ namespace UnbridledSanctum.Combat
             StartCombat(group);
         }
 
+#if UNITY_EDITOR
+        [ContextMenu("Test Combat: Elven Scout (Solo)")]
+        public void TestCombatElvenScout()
+        {
+            StartCombat(new List<EnemyType> { EnemyType.ElvenScout }, 1);
+        }
+
+        [ContextMenu("Test Combat: Elven Scout Duo")]
+        public void TestCombatElvenScoutDuo()
+        {
+            StartCombat(new List<EnemyType> { EnemyType.ElvenScout, EnemyType.ElvenScout }, 1);
+        }
+#endif
+
         public void StartCombat(List<Combatant> enemyGroup)
         {
             StopAllCoroutines();
@@ -898,7 +988,7 @@ namespace UnbridledSanctum.Combat
             // Player combatant - load persistent stats from expedition
             if (player == null)
             {
-                player = Combatant.CreatePlayer(persistentHp, persistentUpperClothesHp, persistentLowerClothesHp);
+                player = Combatant.CreatePlayer(persistentHp, persistentUpperClothesHp, persistentLowerClothesHp, persistentUnderUpperClothesHp, persistentUnderLowerClothesHp);
             }
             player.name = "You";
 
@@ -935,6 +1025,10 @@ namespace UnbridledSanctum.Combat
             player.currentAp = Mathf.Min(player.maxAp, 3);
             player.seduction = persistentSeduction;
             player.seductionStacks = persistentSeductionStacks;
+            player.semenMouthMl = persistentSemenMouthMl;
+            player.semenWombMl = persistentSemenWombMl;
+            player.semenAnalMl = persistentSemenAnalMl;
+            player.semenVolumeMl = persistentSemenVolumeMl;
             player.shield = passiveStartShield;
             player.ResetLustShield();
             if (passiveStartLustShield > 0)
@@ -1453,30 +1547,53 @@ namespace UnbridledSanctum.Combat
             }
             else if (isPenetrating)
             {
-                if (isPureRunActive)
+                if (enemy.gender == EntityGender.Female)
                 {
-                    isPureRunActive = false;
-                    OnCombatLogMessage?.Invoke("<color=#FF4466><b>[PURE COMPROMISED]</b></color> The Vessel was defiled by internal monster seed!");
-                    OnPureStatusChanged?.Invoke(false);
-                }
-                player.AddSemen(pranaAmount);
-                persistentSemenVolumeMl += pranaAmount;
-                FleshTransformationManager.Instance?.AddPrana(pranaAmount, enemy?.name, isInternal: true);
-                int lustShieldGained = Mathf.RoundToInt(pranaAmount * 0.25f);
-                player.AddLustShield(lustShieldGained);
+                    // Female climax in intimate engagement (Kiss / Fingers) - No male/futa semen, does not compromise Pure Run
+                    int lustShieldGained = 25;
+                    player.AddLustShield(lustShieldGained);
+                    player.AddSeduction(20);
 
-                if (slot == PenetrationSlot.Mouth)
-                {
-                    OnCombatLogMessage?.Invoke($"[THROAT INFLUX & SWALLOW] {enemy.name} reaches climax and pumps {pranaAmount}ml of Cum down your throat! (+{lustShieldGained} Lust Shield gained [Total: {player.semenVolumeMl}ml])");
-                }
-                else if (slot == PenetrationSlot.Anal)
-                {
-                    OnCombatLogMessage?.Invoke($"[ANAL CREAMPIE] {enemy.name} reaches climax and floods your Anal tract with {pranaAmount}ml of Cum! (+{lustShieldGained} Lust Shield gained [Total: {player.semenVolumeMl}ml])");
+                    if (slot == PenetrationSlot.Mouth)
+                    {
+                        OnCombatLogMessage?.Invoke($"[APHRODISIAC KISS & FEED] {enemy.name} shudders in ecstasy while holding your mouth, forcing potent aphrodisiac down your throat! (+{lustShieldGained} Lust Shield, +20% Arousal)");
+                    }
+                    else if (slot == PenetrationSlot.Vagina)
+                    {
+                        OnCombatLogMessage?.Invoke($"[MANUAL CLIMAX & NECTAR] {enemy.name}'s rapid finger-play triggers an intense convulsive orgasm, soaking your intimate cleft with slick elven nectar! (+{lustShieldGained} Lust Shield, +20% Arousal)");
+                    }
+                    else
+                    {
+                        OnCombatLogMessage?.Invoke($"[FEMALE CLIMAX] {enemy.name} trembles in overwhelming ecstasy against your vessel! (+{lustShieldGained} Lust Shield gained)");
+                    }
                 }
                 else
                 {
-                    string slotName = slot == PenetrationSlot.Vagina ? "Vagina" : "vessel";
-                    OnCombatLogMessage?.Invoke($"[CREAMPIE] {enemy.name} reaches climax and floods your {slotName} with {pranaAmount}ml of Cum! (+{lustShieldGained} Lust Shield gained [Total: {player.semenVolumeMl}ml])");
+                    if (isPureRunActive)
+                    {
+                        isPureRunActive = false;
+                        OnCombatLogMessage?.Invoke("<color=#FF4466><b>[PURE COMPROMISED]</b></color> The Vessel was defiled by internal monster seed!");
+                        OnPureStatusChanged?.Invoke(false);
+                    }
+                    player.AddSemen(pranaAmount, slot);
+                    AddPersistentSemen(pranaAmount, slot);
+                    FleshTransformationManager.Instance?.AddPrana(pranaAmount, enemy?.name, isInternal: true);
+                    int lustShieldGained = Mathf.RoundToInt(pranaAmount * 0.25f);
+                    player.AddLustShield(lustShieldGained);
+
+                    if (slot == PenetrationSlot.Mouth)
+                    {
+                        OnCombatLogMessage?.Invoke($"[THROAT INFLUX & SWALLOW] {enemy.name} reaches climax and pumps {pranaAmount}ml of Cum down your throat! (+{lustShieldGained} Lust Shield gained [Total: {player.semenVolumeMl}ml])");
+                    }
+                    else if (slot == PenetrationSlot.Anal)
+                    {
+                        OnCombatLogMessage?.Invoke($"[ANAL CREAMPIE] {enemy.name} reaches climax and floods your Anal tract with {pranaAmount}ml of Cum! (+{lustShieldGained} Lust Shield gained [Total: {player.semenVolumeMl}ml])");
+                    }
+                    else
+                    {
+                        string slotName = slot == PenetrationSlot.Vagina ? "Vagina" : "vessel";
+                        OnCombatLogMessage?.Invoke($"[CREAMPIE] {enemy.name} reaches climax and floods your {slotName} with {pranaAmount}ml of Cum! (+{lustShieldGained} Lust Shield gained [Total: {player.semenVolumeMl}ml])");
+                    }
                 }
             }
             else
@@ -1674,14 +1791,13 @@ namespace UnbridledSanctum.Combat
                     {
                         // Even if another enemy holds the player, this enemy CANNOT immediately penetrate from neutral/unattached state!
                         // He must first grab and pin the character!
-                        enemy.isGrapplingPlayer = true;
-                        TransitionStance(CombatStance.Grappled);
-                        OnCombatLogMessage?.Invoke($"{enemy.name} joins the struggle and firmly grapples you! [Must establish hold before penetrating]");
+                        if (!AssignGrapple(enemy))
+                        {
+                            OnCombatLogMessage?.Invoke($"{enemy.name} joins the attack against your pinned vessel!");
+                        }
                     }
                     else if (!enemy.canPenetrate)
                     {
-                        enemy.isGrapplingPlayer = true;
-                        TransitionStance(CombatStance.Grappled);
                         OnCombatLogMessage?.Invoke($"{enemy.name} tightens her grapple hold on you (Female entity)!");
                     }
                     else
@@ -1699,18 +1815,14 @@ namespace UnbridledSanctum.Combat
                         }
                         else
                         {
-                            enemy.isGrapplingPlayer = true;
-                            TransitionStance(CombatStance.Grappled);
                             OnCombatLogMessage?.Invoke($"{enemy.name} attempts to penetrate, but the target orifice is occupied or protected!");
+                            AssignGrapple(enemy, skill.targetGrappleZone);
                         }
                     }
                 }
                 else if (skill.transitionToStance == CombatStance.Grappled)
                 {
-                    enemy.isGrapplingPlayer = true;
-                    enemy.occupiedSlot = PenetrationSlot.None;
-                    TransitionStance(CombatStance.Grappled);
-                    OnCombatLogMessage?.Invoke($"STANCE SHIFT -> GRAPPLED!");
+                    AssignGrapple(enemy, skill.targetGrappleZone);
                 }
                 else if (skill.transitionToStance.HasValue && currentStance != skill.transitionToStance.Value)
                 {
@@ -1817,12 +1929,15 @@ namespace UnbridledSanctum.Combat
 
             ItemData upperItem = characterState.GetEquippedItem(EquipSlot.UpperClothes);
             ItemData lowerItem = characterState.GetEquippedItem(EquipSlot.LowerClothes);
-            ItemData underwearItem = characterState.GetEquippedItem(EquipSlot.Underwear);
+            ItemData underUpperItem = characterState.GetEquippedItem(EquipSlot.UnderUpper);
+            ItemData underLowerItem = characterState.GetEquippedItem(EquipSlot.UnderLower);
             ItemData accessoryItem = characterState.GetEquippedItem(EquipSlot.Accessory);
 
             player.upperItem = upperItem;
             player.lowerItem = lowerItem;
-            player.underwearItem = underwearItem;
+            player.underUpperItem = underUpperItem;
+            player.underLowerItem = underLowerItem;
+            player.underwearItem = underLowerItem != null ? underLowerItem : underUpperItem;
             player.accessoryItem = accessoryItem;
 
             if (upperItem != null)
@@ -1849,6 +1964,26 @@ namespace UnbridledSanctum.Combat
                 player.lowerArmorBuff = 0;
             }
 
+            if (underUpperItem != null)
+            {
+                persistentMaxUnderUpperClothesHp = underUpperItem.durability;
+            }
+            else
+            {
+                persistentUnderUpperClothesHp = 0;
+                persistentMaxUnderUpperClothesHp = 0;
+            }
+
+            if (underLowerItem != null)
+            {
+                persistentMaxUnderLowerClothesHp = underLowerItem.durability;
+            }
+            else
+            {
+                persistentUnderLowerClothesHp = 0;
+                persistentMaxUnderLowerClothesHp = 0;
+            }
+
             if (upperItem != null && upperItem == lowerItem && (upperItem.IsCombinedArmor || upperItem.equipSlot == EquipSlot.CombinedClothes))
             {
                 int syncedHp = Mathf.Min(persistentUpperClothesHp, persistentLowerClothesHp);
@@ -1865,6 +2000,12 @@ namespace UnbridledSanctum.Combat
             player.upperClothesHp = Mathf.Clamp(persistentUpperClothesHp, 0, persistentMaxUpperClothesHp);
             player.maxLowerClothesHp = persistentMaxLowerClothesHp;
             player.lowerClothesHp = Mathf.Clamp(persistentLowerClothesHp, 0, persistentMaxLowerClothesHp);
+
+            player.maxUnderUpperClothesHp = persistentMaxUnderUpperClothesHp;
+            player.underUpperClothesHp = Mathf.Clamp(persistentUnderUpperClothesHp, 0, persistentMaxUnderUpperClothesHp);
+            player.maxUnderLowerClothesHp = persistentMaxUnderLowerClothesHp;
+            player.underLowerClothesHp = Mathf.Clamp(persistentUnderLowerClothesHp, 0, persistentMaxUnderLowerClothesHp);
+
             if (player.isWearingCombinedClothes)
             {
                 player.lowerClothesHp = player.upperClothesHp;
@@ -2061,11 +2202,17 @@ namespace UnbridledSanctum.Combat
             persistentSeductionStacks = 0;
             persistentShield = 0;
             persistentCorruption = 0;
+            persistentSemenVolumeMl = 0;
+            persistentSemenMouthMl = 0;
+            persistentSemenWombMl = 0;
+            persistentSemenAnalMl = 0;
 
             if (characterState != null)
             {
                 ItemData upper = characterState.GetEquippedItem(EquipSlot.UpperClothes);
                 ItemData lower = characterState.GetEquippedItem(EquipSlot.LowerClothes);
+                ItemData underUpper = characterState.GetEquippedItem(EquipSlot.UnderUpper);
+                ItemData underLower = characterState.GetEquippedItem(EquipSlot.UnderLower);
 
                 if (upper != null)
                 {
@@ -2093,6 +2240,28 @@ namespace UnbridledSanctum.Combat
                 {
                     persistentLowerClothesHp = persistentUpperClothesHp;
                 }
+
+                if (underUpper != null)
+                {
+                    persistentMaxUnderUpperClothesHp = underUpper.durability;
+                    persistentUnderUpperClothesHp = underUpper.durability;
+                }
+                else
+                {
+                    persistentMaxUnderUpperClothesHp = 35;
+                    persistentUnderUpperClothesHp = 35;
+                }
+
+                if (underLower != null)
+                {
+                    persistentMaxUnderLowerClothesHp = underLower.durability;
+                    persistentUnderLowerClothesHp = underLower.durability;
+                }
+                else
+                {
+                    persistentMaxUnderLowerClothesHp = 35;
+                    persistentUnderLowerClothesHp = 35;
+                }
             }
             else
             {
@@ -2100,6 +2269,10 @@ namespace UnbridledSanctum.Combat
                 persistentUpperClothesHp = 65;
                 persistentMaxLowerClothesHp = 65;
                 persistentLowerClothesHp = 65;
+                persistentMaxUnderUpperClothesHp = 35;
+                persistentUnderUpperClothesHp = 35;
+                persistentMaxUnderLowerClothesHp = 35;
+                persistentUnderLowerClothesHp = 35;
             }
 
             RecalculatePersistentStats(isNewExpedition: true);
@@ -2112,12 +2285,18 @@ namespace UnbridledSanctum.Combat
             persistentHp = Mathf.Clamp(player.currentHp, 0, persistentMaxHp);
             persistentUpperClothesHp = Mathf.Clamp(player.upperClothesHp, 0, persistentMaxUpperClothesHp);
             persistentLowerClothesHp = Mathf.Clamp(player.lowerClothesHp, 0, persistentMaxLowerClothesHp);
+            persistentUnderUpperClothesHp = Mathf.Clamp(player.underUpperClothesHp, 0, persistentMaxUnderUpperClothesHp);
+            persistentUnderLowerClothesHp = Mathf.Clamp(player.underLowerClothesHp, 0, persistentMaxUnderLowerClothesHp);
             if (player.isWearingCombinedClothes)
             {
                 persistentLowerClothesHp = persistentUpperClothesHp;
             }
             persistentSeduction = player.seduction;
             persistentSeductionStacks = player.seductionStacks;
+            persistentSemenMouthMl = player.semenMouthMl;
+            persistentSemenWombMl = player.semenWombMl;
+            persistentSemenAnalMl = player.semenAnalMl;
+            persistentSemenVolumeMl = player.semenVolumeMl;
             OnPersistentStatsChanged?.Invoke();
         }
 

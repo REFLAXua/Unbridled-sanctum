@@ -34,6 +34,7 @@ public class GameUIManager : MonoBehaviour
     public ExpeditionMapUI expeditionMapUI;
     public CombatUI combatUI;
     public CombatManager combatManager;
+    public CharacterProfileUI characterProfileUI;
 
     private int maxFloorReached = 1;
 
@@ -166,6 +167,19 @@ public class GameUIManager : MonoBehaviour
                 dialogueUI.Initialize(characterState);
             }
         }
+
+        if (characterProfileUI == null)
+        {
+            characterProfileUI = canvasTrans.GetComponentInChildren<CharacterProfileUI>(true);
+            if (characterProfileUI == null)
+            {
+                characterProfileUI = CharacterProfileUI.CreateDynamic(canvasTrans, characterState, inventoryManager, paperDoll);
+            }
+            else
+            {
+                characterProfileUI.Initialize(characterState, inventoryManager, paperDoll);
+            }
+        }
     }
 
     private void HandleCombatVictoryFinished()
@@ -229,6 +243,10 @@ public class GameUIManager : MonoBehaviour
     public void SetState(GameFlowState newState)
     {
         currentState = newState;
+        if (characterProfileUI != null && characterProfileUI.IsOpen)
+        {
+            characterProfileUI.Close();
+        }
 
         switch (currentState)
         {

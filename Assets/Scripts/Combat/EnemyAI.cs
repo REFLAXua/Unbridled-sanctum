@@ -333,6 +333,86 @@ namespace UnbridledSanctum.Combat
 
 
         // =========================================================================
+        // ELVEN SCOUT SKILLS (Zero-phallus Female, Agility, Pheromones, Fingers & Kiss)
+        // =========================================================================
+
+        // --- Elven Scout: Neutral Stance (Precision Archery, Pheromones, Seduction) ---
+        private static readonly EnemySkill ScoutAimedShot = new EnemySkill(
+            "Aimed Shot", manaCost: 0, hpDmg: 8, clothesDmg: 12, seductionDmg: 0, shieldGain: 0, manaGain: 4,
+            desc: "Draws her recurve bow with serene poise, releasing a piercing arrow targeting weak seams in your armor!",
+            armorTarget: ArmorTargetSlot.Upper, staminaDmg: 5, pranaGain: 0, stanceReq: CombatStance.Neutral
+        );
+
+        private static readonly EnemySkill ScoutPheromoneGrenade = new EnemySkill(
+            "Pheromone Grenade", manaCost: 3, hpDmg: 0, clothesDmg: 14, seductionDmg: 20, shieldGain: 0, manaGain: 0,
+            desc: "Shatters a delicate glass vial of concentrated woodland pheromones, wrapping you in sweet intoxicant vapors!",
+            armorTarget: ArmorTargetSlot.All, staminaDmg: 6, pranaGain: 0, stanceReq: CombatStance.Neutral
+        );
+
+        private static readonly EnemySkill ScoutSeductiveTease = new EnemySkill(
+            "Seductive Tease", manaCost: 0, hpDmg: 0, clothesDmg: 0, seductionDmg: 16, shieldGain: 0, manaGain: 5,
+            desc: "Her slender ears twitch as she offers an alluring smirk: 'Quiet now, sweet vessel... our grove will take much tender care of you.'",
+            armorTarget: ArmorTargetSlot.All, staminaDmg: 3, pranaGain: 0, stanceReq: CombatStance.Neutral
+        );
+
+        private static readonly EnemySkill ScoutFacePin = new EnemySkill(
+            "Face Pin & Intoxicant Hold", manaCost: 2, hpDmg: 0, clothesDmg: 0, seductionDmg: 16, shieldGain: 0, manaGain: 0,
+            desc: "Darts in close and clamps both slender hands around your cheeks, pinning your head to the moss while whispering sweet elven promises!",
+            armorTarget: ArmorTargetSlot.Upper, staminaDmg: 10, pranaGain: 0, stanceReq: CombatStance.Neutral,
+            transitionTo: CombatStance.Grappled, targetSlot: PenetrationSlot.None, targetGrapple: GrappleZone.Upper
+        );
+
+        private static readonly EnemySkill ScoutThighPin = new EnemySkill(
+            "Thigh Pin & Leg Spread", manaCost: 2, hpDmg: 0, clothesDmg: 8, seductionDmg: 14, shieldGain: 0, manaGain: 0,
+            desc: "Scissor-locks her athletic bare thighs firmly around your hips, forcing your knees apart to leave your feminine cleft vulnerable!",
+            armorTarget: ArmorTargetSlot.Lower, staminaDmg: 12, pranaGain: 0, stanceReq: CombatStance.Neutral,
+            transitionTo: CombatStance.Grappled, targetSlot: PenetrationSlot.None, targetGrapple: GrappleZone.Lower
+        );
+
+        // --- Elven Scout: Grappled Stance (Bodily Pin, Stripping, Kiss / Finger Transition) ---
+        private static readonly EnemySkill ScoutThighClamp = new EnemySkill(
+            "Thigh Clamp Hold", manaCost: 0, hpDmg: 0, clothesDmg: 5, seductionDmg: 12, shieldGain: 3, manaGain: 3,
+            desc: "Clamps her supple athletic thighs tightly across your torso, crushing your breath and weakening your stance.",
+            armorTarget: ArmorTargetSlot.Lower, staminaDmg: 10, pranaGain: 0, stanceReq: CombatStance.Grappled
+        );
+
+        private static readonly EnemySkill ScoutStripLower = new EnemySkill(
+            "Lithe Armor Peel", manaCost: 1, hpDmg: 0, clothesDmg: 30, seductionDmg: 12, shieldGain: 0, manaGain: 0,
+            desc: "Slips her nimble fingers beneath the waistband of your lower garment, tearing the laces open to bare your soft thighs!",
+            armorTarget: ArmorTargetSlot.Lower, staminaDmg: 5, pranaGain: 0, stanceReq: CombatStance.Grappled
+        );
+
+        private static readonly EnemySkill ScoutAphrodisiacKiss = new EnemySkill(
+            "Aphrodisiac Kiss", manaCost: 2, hpDmg: 0, clothesDmg: 0, seductionDmg: 28, shieldGain: 0, manaGain: 0,
+            desc: "Pins your cheeks with slender hands and captures your lips in a passionate, intoxicating elven kiss, sharing heady nectar!",
+            armorTarget: ArmorTargetSlot.Upper, staminaDmg: 8, pranaGain: 0, stanceReq: CombatStance.Grappled,
+            transitionTo: CombatStance.Penetrated, targetSlot: PenetrationSlot.Mouth
+        );
+
+        private static readonly EnemySkill ScoutFingerPlay = new EnemySkill(
+            "Manual Incursion (Fingers)", manaCost: 2, hpDmg: 0, clothesDmg: 0, seductionDmg: 32, shieldGain: 0, manaGain: 0,
+            desc: "Reaches between your exposed thighs, deftly parting your soaked petal folds to slide her agile elven fingers inside!",
+            armorTarget: ArmorTargetSlot.Lower, staminaDmg: 8, pranaGain: 0, stanceReq: CombatStance.Grappled,
+            transitionTo: CombatStance.Penetrated, targetSlot: PenetrationSlot.Vagina
+        );
+
+        // --- Elven Scout: Penetrated Stance (Dedicated single move per orifice) ---
+        private static readonly EnemySkill ScoutNectarKiss = new EnemySkill(
+            "Nectar Influx Kiss", manaCost: 0, hpDmg: 0, clothesDmg: 0, seductionDmg: 28, shieldGain: 0, manaGain: 5,
+            desc: "Her tongue swirls deeply against yours, parting your lips to let warm, aphrodisiac-laced saliva trickle down your throat.",
+            armorTarget: ArmorTargetSlot.All, staminaDmg: 6, pranaGain: 0, stanceReq: CombatStance.Penetrated,
+            transitionTo: null, selfArousal: 18, targetSlot: PenetrationSlot.Mouth
+        );
+
+        private static readonly EnemySkill ScoutVaginalFingers = new EnemySkill(
+            "Vaginal Finger Penetration", manaCost: 0, hpDmg: 0, clothesDmg: 0, seductionDmg: 34, shieldGain: 0, manaGain: 5,
+            desc: "Curves her agile elven fingers deep within your damp vessel, stroking with slick rhythmic speed that drives your hips into convulsive trembling.",
+            armorTarget: ArmorTargetSlot.All, staminaDmg: 8, pranaGain: 0, stanceReq: CombatStance.Penetrated,
+            transitionTo: null, selfArousal: 20, targetSlot: PenetrationSlot.Vagina
+        );
+
+
+        // =========================================================================
         // GENERIC / FALLBACK SKILLS (Guarantees no weapon attacks during penetration)
         // =========================================================================
         private static readonly EnemySkill GenericPenetratedPumping = new EnemySkill(
@@ -394,6 +474,9 @@ namespace UnbridledSanctum.Combat
                 case EnemyType.Succubus:
                     return ChooseSuccubusAction(enemy, player, effectiveStance);
 
+                case EnemyType.ElvenScout:
+                    return ChooseScoutAction(enemy, player, effectiveStance);
+
                 default:
                     if (effectiveStance == CombatStance.Penetrated || effectiveStance == CombatStance.ThroatLock)
                     {
@@ -431,9 +514,11 @@ namespace UnbridledSanctum.Combat
         {
             bool hasUpper = player.upperClothesHp > 0;
             bool hasLower = player.lowerClothesHp > 0;
+            var cm = CombatManager.Instance;
+            bool canGrapple = cm == null || cm.CanGrapple(enemy);
 
             // If player's stamina is dangerously low (<= 8) or lower clothes shredded, attempt grapple pounce!
-            if (player.currentStamina <= 8 || !hasLower)
+            if (canGrapple && (player.currentStamina <= 8 || !hasLower))
             {
                 if (UnityEngine.Random.value < 0.60f) return SlimeAdhesivePounce;
             }
@@ -597,9 +682,11 @@ namespace UnbridledSanctum.Combat
         {
             bool hasUpper = player.upperClothesHp > 0;
             bool hasLower = player.lowerClothesHp > 0;
+            var cm = CombatManager.Instance;
+            bool canGrapple = cm == null || cm.CanGrapple(enemy);
 
             // If player's stamina is low (<= 8) or player naked, succubus pounces to grapple!
-            if (player.currentStamina <= 8 || (!hasUpper && !hasLower))
+            if (canGrapple && (player.currentStamina <= 8 || (!hasUpper && !hasLower)))
             {
                 if (UnityEngine.Random.value < 0.60f) return SuccubusDemonicPounce;
             }
@@ -720,6 +807,119 @@ namespace UnbridledSanctum.Combat
                         return SuccubusCervixLock;
                     return SuccubusAbyssalThrusts;
             }
+        }
+
+
+        // =========================================================================
+        // ELVEN SCOUT AI
+        // =========================================================================
+
+        private static EnemySkill ChooseScoutAction(Combatant enemy, Combatant player, CombatStance stance)
+        {
+            switch (stance)
+            {
+                case CombatStance.Penetrated:
+                case CombatStance.ThroatLock:
+                    return ChooseScoutPenetratedAction(enemy, player);
+
+                case CombatStance.Grappled:
+                    return ChooseScoutGrappledAction(enemy, player);
+
+                case CombatStance.Neutral:
+                default:
+                    return ChooseScoutNeutralAction(enemy, player);
+            }
+        }
+
+        private static EnemySkill ChooseScoutNeutralAction(Combatant enemy, Combatant player)
+        {
+            var cm = CombatManager.Instance;
+            bool canLowerGrapple = cm == null || cm.CanGrapple(enemy, GrappleZone.Lower);
+            bool canUpperGrapple = cm == null || cm.CanGrapple(enemy, GrappleZone.Upper);
+
+            // Cascade 1 (Thigh Pin -> Vaginal Track): Prioritized if player's stamina is low or lower garments torn
+            if (canLowerGrapple && (player.currentStamina <= 10 || player.isOuterLowerTorn))
+            {
+                if (UnityEngine.Random.value < 0.65f) return ScoutThighPin;
+            }
+
+            // Cascade 2 (Face Pin -> Oral Track): Prioritized if player has high arousal
+            if (canUpperGrapple && (player.seduction >= 25 || player.seductionStacks >= 1))
+            {
+                if (UnityEngine.Random.value < 0.50f) return ScoutFacePin;
+            }
+
+            // Opportunistic thigh pin if lower zone is free
+            if (canLowerGrapple && UnityEngine.Random.value < 0.35f)
+            {
+                return ScoutThighPin;
+            }
+
+            // High arousal tease
+            if (player.seductionStacks >= 1 && UnityEngine.Random.value < 0.40f)
+            {
+                return ScoutSeductiveTease;
+            }
+
+            float roll = UnityEngine.Random.value;
+            if (enemy.currentMana >= ScoutPheromoneGrenade.manaCost && roll < 0.35f)
+            {
+                return ScoutPheromoneGrenade;
+            }
+            if (roll < 0.70f)
+            {
+                return ScoutAimedShot;
+            }
+            return ScoutSeductiveTease;
+        }
+
+        private static EnemySkill ChooseScoutGrappledAction(Combatant enemy, Combatant player)
+        {
+            var cm = CombatManager.Instance;
+
+            // --- TRACK 1: Face Pin -> Dedicated cascade into Oral Penetration (Mouth) ---
+            if (enemy.heldGrappleZone == GrappleZone.Upper)
+            {
+                bool canOral = cm != null ? cm.CanPenetrateSlot(enemy, PenetrationSlot.Mouth) : true;
+                if (canOral)
+                {
+                    return ScoutAphrodisiacKiss;
+                }
+                return ScoutSeductiveTease;
+            }
+
+            // --- TRACK 2: Thigh Pin -> Dedicated cascade into Vaginal Penetration (Fingers) ---
+            bool isGroinExposed = player.isGroinExposed;
+            bool canVagina = cm != null ? cm.CanPenetrateSlot(enemy, PenetrationSlot.Vagina) : isGroinExposed;
+
+            // Step 1: If lower garments / panties are still intact -> Strip lower clothes!
+            if (!isGroinExposed)
+            {
+                float r = UnityEngine.Random.value;
+                if (r < 0.65f) return ScoutStripLower;
+                return ScoutThighClamp;
+            }
+
+            // Step 2: Panties torn & groin exposed -> 100% cascade into Vaginal Finger Penetration!
+            if (canVagina)
+            {
+                return ScoutFingerPlay;
+            }
+
+            return ScoutThighClamp;
+        }
+
+        private static EnemySkill ChooseScoutPenetratedAction(Combatant enemy, Combatant player)
+        {
+            PenetrationSlot slot = enemy.occupiedSlot;
+
+            if (slot == PenetrationSlot.Mouth)
+            {
+                return ScoutNectarKiss;
+            }
+
+            // Vagina (Finger Penetration)
+            return ScoutVaginalFingers;
         }
     }
 }

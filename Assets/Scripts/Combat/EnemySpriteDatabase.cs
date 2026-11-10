@@ -94,6 +94,15 @@ namespace UnbridledSanctum.Combat
         }
     }
 
+    [System.Serializable]
+    public class ModularEnemySpriteSet
+    {
+        public EnemyType enemyType = EnemyType.ElvenScout;
+        public Sprite baseBody;
+        public Sprite upperClothes;
+        public Sprite lowerClothes;
+    }
+
     [CreateAssetMenu(fileName = "EnemySpriteDatabase", menuName = "Game/Enemy Sprite Database")]
     public class EnemySpriteDatabase : ScriptableObject
     {
@@ -121,19 +130,52 @@ namespace UnbridledSanctum.Combat
         public EnemySpriteSet slimeGirl = new EnemySpriteSet { enemyType = EnemyType.SlimeGirl };
         public EnemySpriteSet succubus = new EnemySpriteSet { enemyType = EnemyType.Succubus };
 
+        [Header("Modular Paper Doll Enemy Sets")]
+        public ModularEnemySpriteSet elvenScout = new ModularEnemySpriteSet { enemyType = EnemyType.ElvenScout };
+
         public EnemySpriteSet GetSet(EnemyType type)
         {
-            return type == EnemyType.SlimeGirl ? slimeGirl : succubus;
+            if (type == EnemyType.SlimeGirl) return slimeGirl;
+            if (type == EnemyType.Succubus) return succubus;
+            return null;
+        }
+
+        public bool IsModularEnemy(EnemyType type)
+        {
+            return type == EnemyType.ElvenScout;
+        }
+
+        public bool TryGetModularSprites(EnemyType type, out Sprite baseSprite, out Sprite topSprite, out Sprite bottomSprite)
+        {
+            if (type == EnemyType.ElvenScout && elvenScout != null && elvenScout.baseBody != null)
+            {
+                baseSprite = elvenScout.baseBody;
+                topSprite = elvenScout.upperClothes;
+                bottomSprite = elvenScout.lowerClothes;
+                return true;
+            }
+            baseSprite = null;
+            topSprite = null;
+            bottomSprite = null;
+            return false;
         }
 
         public Sprite GetCombatSprite(EnemyType type, int seductionStacks, bool isDefeated)
         {
+            if (type == EnemyType.ElvenScout && elvenScout != null)
+            {
+                return elvenScout.baseBody;
+            }
             EnemySpriteSet set = GetSet(type);
             return set != null ? set.GetCombatSprite(seductionStacks, isDefeated) : null;
         }
 
         public Sprite GetDialogueSprite(EnemyType type, int seductionStacks, string emotionKey)
         {
+            if (type == EnemyType.ElvenScout && elvenScout != null)
+            {
+                return elvenScout.baseBody;
+            }
             EnemySpriteSet set = GetSet(type);
             return set != null ? set.GetDialogueSprite(seductionStacks, emotionKey) : null;
         }
@@ -144,9 +186,18 @@ namespace UnbridledSanctum.Combat
         {
             PopulateSlime();
             PopulateSuccubus();
+            PopulateScout();
             EditorUtility.SetDirty(this);
             AssetDatabase.SaveAssets();
             Debug.Log("[EnemySpriteDatabase] Auto-populated successfully.");
+        }
+
+        private void PopulateScout()
+        {
+            elvenScout.enemyType = EnemyType.ElvenScout;
+            elvenScout.baseBody = LoadSprite("Assets/sprites/Characters/Scout/scout_base.png");
+            elvenScout.upperClothes = LoadSprite("Assets/sprites/Characters/Scout/scout_top.png");
+            elvenScout.lowerClothes = LoadSprite("Assets/sprites/Characters/Scout/scout_bottom.png");
         }
 
         private void PopulateSlime()

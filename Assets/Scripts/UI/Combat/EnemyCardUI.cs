@@ -22,6 +22,11 @@ namespace UnbridledSanctum.UI
         public TextMeshProUGUI nameText;
         public Image portraitImage;
         public RectTransform portraitTransform;
+
+        [Header("Modular Paper Doll Overlays")]
+        public Image upperClothesOverlay;
+        public Image lowerClothesOverlay;
+
         public TextMeshProUGUI hpText;
         public TextMeshProUGUI mpText;
         public TextMeshProUGUI seductionText;
@@ -140,31 +145,31 @@ namespace UnbridledSanctum.UI
             // Sprite phase and dimming
             if (portraitImage != null && EnemySpriteDatabase.Instance != null)
             {
-                Sprite sp = EnemySpriteDatabase.Instance.GetCombatSprite(enemy.enemyType, enemy.seductionStacks, enemy.isDefeated);
-                if (sp != null)
-                {
-                    portraitImage.sprite = sp;
-                    portraitImage.enabled = true;
-                }
+                ApplyCombatSprite(enemy.seductionStacks);
 
+                Color tintColor;
                 if (enemy.isDefeated)
                 {
-                    portraitImage.color = new Color(0.35f, 0.35f, 0.40f, 0.65f);
+                    tintColor = new Color(0.35f, 0.35f, 0.40f, 0.65f);
                 }
                 else if (isTargetingMode)
                 {
                     // Emphasize the target, dim non-targets
-                    portraitImage.color = isSelected ? Color.white : new Color(0.40f, 0.42f, 0.48f, 0.65f);
+                    tintColor = isSelected ? Color.white : new Color(0.40f, 0.42f, 0.48f, 0.65f);
                 }
                 else if (anyEnemyTurnActive)
                 {
                     // When an enemy is taking their turn, acting enemy stays bright, others gently stepped back
-                    portraitImage.color = showTurnHighlight ? Color.white : new Color(0.72f, 0.74f, 0.80f, 0.85f);
+                    tintColor = showTurnHighlight ? Color.white : new Color(0.72f, 0.74f, 0.80f, 0.85f);
                 }
                 else
                 {
-                    portraitImage.color = Color.white;
+                    tintColor = Color.white;
                 }
+
+                portraitImage.color = tintColor;
+                if (upperClothesOverlay != null && upperClothesOverlay.gameObject.activeSelf) upperClothesOverlay.color = tintColor;
+                if (lowerClothesOverlay != null && lowerClothesOverlay.gameObject.activeSelf) lowerClothesOverlay.color = tintColor;
 
                 if (lastSeductionPhase != -1 && lastSeductionPhase != enemy.seductionStacks && !enemy.isDefeated)
                 {
@@ -251,7 +256,8 @@ namespace UnbridledSanctum.UI
                     }
                     if (statusSquareLabel != null)
                     {
-                        statusSquareLabel.text = "GRAPPLE";
+                        string zoneTag = enemy.heldGrappleZone == GrappleZone.Upper ? "FACE" : "THIGHS";
+                        statusSquareLabel.text = $"GRAPPLE\n[{zoneTag}]";
                         statusSquareLabel.color = new Color(1f, 0.75f, 0.30f, 1f);
                     }
                 }
@@ -327,6 +333,89 @@ namespace UnbridledSanctum.UI
             }
         }
 
+        private void EnsureModularOverlaysExist()
+        {
+            if (portraitImage == null) return;
+
+            if (lowerClothesOverlay == null)
+            {
+                Transform existing = portraitImage.transform.Find("LowerClothesOverlay");
+                if (existing != null)
+                {
+                    lowerClothesOverlay = existing.GetComponent<Image>();
+                }
+                else
+                {
+                    GameObject go = new GameObject("LowerClothesOverlay", typeof(RectTransform), typeof(Image));
+                    go.transform.SetParent(portraitImage.transform, false);
+                    RectTransform rt = go.GetComponent<RectTransform>();
+                    rt.anchorMin = Vector2.zero;
+                    rt.anchorMax = Vector2.one;
+                    rt.sizeDelta = Vector2.zero;
+                    rt.anchoredPosition = Vector2.zero;
+                    lowerClothesOverlay = go.GetComponent<Image>();
+                    lowerClothesOverlay.raycastTarget = false;
+                }
+            }
+
+            if (upperClothesOverlay == null)
+            {
+                Transform existing = portraitImage.transform.Find("UpperClothesOverlay");
+                if (existing != null)
+                {
+                    upperClothesOverlay = existing.GetComponent<Image>();
+                }
+                else
+                {
+                    GameObject go = new GameObject("UpperClothesOverlay", typeof(RectTransform), typeof(Image));
+                    go.transform.SetParent(portraitImage.transform, false);
+                    RectTransform rt = go.GetComponent<RectTransform>();
+                    rt.anchorMin = Vector2.zero;
+                    rt.anchorMax = Vector2.one;
+                    rt.sizeDelta = Vector2.zero;
+                    rt.anchoredPosition = Vector2.zero;
+                    upperClothesOverlay = go.GetComponent<Image>();
+                    upperClothesOverlay.raycastTarget = false;
+                }
+            }
+        }
+
+        private void ApplyCombatSprite(int newPhase)
+        {
+            if (assignedEnemy == null || EnemySpriteDatabase.Instance == null || portraitImage == null) return;
+
+            bool isModular = EnemySpriteDatabase.Instance.IsModularEnemy(assignedEnemy.enemyType);
+            if (isModular && EnemySpriteDatabase.Instance.TryGetModularSprites(assignedEnemy.enemyType, out Sprite baseSp, out Sprite topSp, out Sprite bottomSp))
+            {
+                EnsureModularOverlaysExist();
+                portraitImage.sprite = baseSp;
+                portraitImage.enabled = true;
+
+                if (lowerClothesOverlay != null)
+                {
+                    lowerClothesOverlay.sprite = bottomSp;
+                    lowerClothesOverlay.gameObject.SetActive(!assignedEnemy.isLowerTorn);
+                }
+                if (upperClothesOverlay != null)
+                {
+                    upperClothesOverlay.sprite = topSp;
+                    upperClothesOverlay.gameObject.SetActive(!assignedEnemy.isUpperTorn);
+                }
+            }
+            else
+            {
+                if (lowerClothesOverlay != null) lowerClothesOverlay.gameObject.SetActive(false);
+                if (upperClothesOverlay != null) upperClothesOverlay.gameObject.SetActive(false);
+
+                Sprite sp = EnemySpriteDatabase.Instance.GetCombatSprite(assignedEnemy.enemyType, newPhase, assignedEnemy.isDefeated);
+                if (sp != null)
+                {
+                    portraitImage.sprite = sp;
+                    portraitImage.enabled = true;
+                }
+            }
+        }
+
         public void PlayPhaseTransition(int newPhase)
         {
             StopCoroutine("PhaseTransitionRoutine");
@@ -347,15 +436,7 @@ namespace UnbridledSanctum.UI
                     yield return null;
                 }
 
-                if (assignedEnemy != null && EnemySpriteDatabase.Instance != null && portraitImage != null)
-                {
-                    Sprite sp = EnemySpriteDatabase.Instance.GetCombatSprite(assignedEnemy.enemyType, newPhase, assignedEnemy.isDefeated);
-                    if (sp != null)
-                    {
-                        portraitImage.sprite = sp;
-                        portraitImage.enabled = true;
-                    }
-                }
+                ApplyCombatSprite(newPhase);
 
                 float fadeOut = 0.45f;
                 elapsed = 0f;
@@ -370,15 +451,7 @@ namespace UnbridledSanctum.UI
             }
             else
             {
-                if (assignedEnemy != null && EnemySpriteDatabase.Instance != null && portraitImage != null)
-                {
-                    Sprite sp = EnemySpriteDatabase.Instance.GetCombatSprite(assignedEnemy.enemyType, newPhase, assignedEnemy.isDefeated);
-                    if (sp != null)
-                    {
-                        portraitImage.sprite = sp;
-                        portraitImage.enabled = true;
-                    }
-                }
+                ApplyCombatSprite(newPhase);
             }
         }
 

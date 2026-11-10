@@ -44,7 +44,8 @@ public class ItemData : ScriptableObject
     public bool IsCombinedArmor => equipSlot == EquipSlot.CombinedClothes;
     public bool IsUpperArmor => equipSlot == EquipSlot.UpperClothes || equipSlot == EquipSlot.CombinedClothes;
     public bool IsLowerArmor => equipSlot == EquipSlot.LowerClothes || equipSlot == EquipSlot.CombinedClothes;
-    public bool IsArmor => equipSlot == EquipSlot.UpperClothes || equipSlot == EquipSlot.LowerClothes || equipSlot == EquipSlot.CombinedClothes;
+    public bool IsUnderwear => equipSlot == EquipSlot.UnderUpper || equipSlot == EquipSlot.UnderLower;
+    public bool IsArmor => equipSlot == EquipSlot.UpperClothes || equipSlot == EquipSlot.LowerClothes || equipSlot == EquipSlot.CombinedClothes || equipSlot == EquipSlot.UnderUpper || equipSlot == EquipSlot.UnderLower;
 
     [Header("Paper Doll Layer Controls")]
     [Tooltip("If true, hides the modular breast layer when this upper or combined clothing is equipped.")]

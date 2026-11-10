@@ -25,6 +25,11 @@ public class PaperDollController : MonoBehaviour
     public Image groinImage;
     public Image breastImage;
     public Image underwearImage;
+
+    [Header("Underwear Layers (Split: Bra & Panties)")]
+    public Image underUpperImage; // Bra / Upper Underwear
+    public Image underLowerImage; // Panties / Lower Underwear
+
     public Image clothesImage;
     public Image lowerClothesImage;
     public Image expressionImage;
@@ -60,11 +65,12 @@ public class PaperDollController : MonoBehaviour
     {
         EnsureGroinLayer();
         EnsureBreastLayer();
+        EnsureUnderwearLayers();
         EnsureLowerClothesLayer();
         EnsureExpressionLayer();
 
         // Enforce preserveAspect and stretch on all paper doll layers
-        Image[] allLayers = { hairBackImage, bodyImage, groinImage, breastImage, underwearImage, lowerClothesImage, clothesImage, expressionImage, blushImage, hairFrontImage, eyebrowsImage, accessoryImage };
+        Image[] allLayers = { hairBackImage, bodyImage, groinImage, breastImage, underwearImage, underLowerImage, underUpperImage, lowerClothesImage, clothesImage, expressionImage, blushImage, hairFrontImage, eyebrowsImage, accessoryImage };
         foreach (var img in allLayers)
         {
             if (img != null)
@@ -436,7 +442,8 @@ public class PaperDollController : MonoBehaviour
         }
 
         // Groin is strictly visible only if NOT covered by underwear, lower clothes, or full-body combined outfit
-        bool hasUnderwear = (underwearImage != null && underwearImage.enabled && underwearImage.sprite != null);
+        bool hasUnderwear = (underLowerImage != null && underLowerImage.enabled && underLowerImage.sprite != null) ||
+                            (underwearImage != null && underwearImage.enabled && underwearImage.sprite != null);
         bool hasLower = (lowerClothesImage != null && lowerClothesImage.enabled && lowerClothesImage.sprite != null);
 
         bool hasCombinedSuit = false;
@@ -510,6 +517,88 @@ public class PaperDollController : MonoBehaviour
             {
                 breastImage.enabled = false;
             }
+        }
+    }
+
+    public void EnsureUnderwearLayers()
+    {
+        if (bodyImage == null) return;
+
+        if (underLowerImage == null)
+        {
+            if (underwearImage != null)
+            {
+                underLowerImage = underwearImage;
+            }
+            else
+            {
+                Transform existing = transform.Find("UnderLower");
+                if (existing != null)
+                {
+                    underLowerImage = existing.GetComponent<Image>();
+                }
+                else
+                {
+                    GameObject ulObj = new GameObject("UnderLower", typeof(RectTransform), typeof(Image));
+                    ulObj.transform.SetParent(transform, false);
+
+                    int insertIdx = groinImage != null ? groinImage.transform.GetSiblingIndex() + 1 : bodyImage.transform.GetSiblingIndex() + 1;
+                    ulObj.transform.SetSiblingIndex(insertIdx);
+
+                    RectTransform ulRt = ulObj.GetComponent<RectTransform>();
+                    RectTransform bodyRt = bodyImage.rectTransform;
+                    ulRt.anchorMin = bodyRt.anchorMin;
+                    ulRt.anchorMax = bodyRt.anchorMax;
+                    ulRt.pivot = bodyRt.pivot;
+                    ulRt.anchoredPosition = bodyRt.anchoredPosition;
+                    ulRt.sizeDelta = bodyRt.sizeDelta;
+
+                    underLowerImage = ulObj.GetComponent<Image>();
+                    underLowerImage.raycastTarget = false;
+                    underLowerImage.enabled = false;
+                }
+            }
+        }
+
+        if (underUpperImage == null)
+        {
+            Transform existing = transform.Find("UnderUpper");
+            if (existing != null)
+            {
+                underUpperImage = existing.GetComponent<Image>();
+            }
+            else
+            {
+                GameObject uuObj = new GameObject("UnderUpper", typeof(RectTransform), typeof(Image));
+                uuObj.transform.SetParent(transform, false);
+
+                int insertIdx = underLowerImage != null ? underLowerImage.transform.GetSiblingIndex() + 1 : (breastImage != null ? breastImage.transform.GetSiblingIndex() + 1 : bodyImage.transform.GetSiblingIndex() + 1);
+                uuObj.transform.SetSiblingIndex(insertIdx);
+
+                RectTransform uuRt = uuObj.GetComponent<RectTransform>();
+                RectTransform bodyRt = bodyImage.rectTransform;
+                uuRt.anchorMin = bodyRt.anchorMin;
+                uuRt.anchorMax = bodyRt.anchorMax;
+                uuRt.pivot = bodyRt.pivot;
+                uuRt.anchoredPosition = bodyRt.anchoredPosition;
+                uuRt.sizeDelta = bodyRt.sizeDelta;
+
+                underUpperImage = uuObj.GetComponent<Image>();
+                underUpperImage.raycastTarget = false;
+                underUpperImage.enabled = false;
+            }
+        }
+
+        if (underLowerImage != null)
+        {
+            underLowerImage.preserveAspect = true;
+            if (underLowerImage.sprite == null) underLowerImage.enabled = false;
+        }
+
+        if (underUpperImage != null)
+        {
+            underUpperImage.preserveAspect = true;
+            if (underUpperImage.sprite == null) underUpperImage.enabled = false;
         }
     }
 
@@ -641,7 +730,9 @@ public class PaperDollController : MonoBehaviour
             ClearImage(lowerClothesImage);
         }
 
-        RefreshSlot(EquipSlot.Underwear, underwearImage);
+        EnsureUnderwearLayers();
+        RefreshSlot(EquipSlot.UnderUpper, underUpperImage);
+        RefreshSlot(EquipSlot.UnderLower, underLowerImage != null ? underLowerImage : underwearImage);
         RefreshSlot(EquipSlot.Accessory, accessoryImage);
 
         RefreshBreastLayer();
@@ -651,7 +742,12 @@ public class PaperDollController : MonoBehaviour
                              (lowerClothesImage != null && lowerClothesImage.enabled && lowerClothesImage.sprite != null);
         if (hadClothesLastCheck && !hasClothesNow)
         {
-            TriggerTemporaryEmotion("shocked", 1.8f);
+            GameUIManager gum = FindFirstObjectByType<GameUIManager>();
+            bool isLobby = (gum != null && gum.currentState == GameUIManager.GameFlowState.Lobby);
+            if (!isLobby)
+            {
+                TriggerTemporaryEmotion("shocked", 1.8f);
+            }
         }
         hadClothesLastCheck = hasClothesNow;
     }

@@ -248,7 +248,8 @@ namespace UnbridledSanctum.Combat
     public enum EnemyType
     {
         SlimeGirl,
-        Succubus
+        Succubus,
+        ElvenScout
     }
 
     public enum ArmorTargetSlot
@@ -256,6 +257,13 @@ namespace UnbridledSanctum.Combat
         All,
         Upper,
         Lower
+    }
+
+    public enum GrappleZone
+    {
+        None = 0,
+        Upper = 1, // Face & Head Hold (Prepares Mouth / Oral penetration)
+        Lower = 2  // Thighs & Pelvis Lock (Prepares Vagina / Manual penetration)
     }
 
     [System.Serializable]
@@ -276,6 +284,7 @@ namespace UnbridledSanctum.Combat
         public CombatStance stanceRequirement;
         public CombatStance? transitionToStance;
         public PenetrationSlot targetPenetrationSlot;
+        public GrappleZone targetGrappleZone;
 
         public EnemySkill(
             string name,
@@ -292,7 +301,8 @@ namespace UnbridledSanctum.Combat
             CombatStance stanceReq = CombatStance.Neutral,
             CombatStance? transitionTo = null,
             int selfArousal = 0,
-            PenetrationSlot targetSlot = PenetrationSlot.None)
+            PenetrationSlot targetSlot = PenetrationSlot.None,
+            GrappleZone targetGrapple = GrappleZone.None)
         {
             this.skillName = name;
             this.manaCost = manaCost;
@@ -309,6 +319,7 @@ namespace UnbridledSanctum.Combat
             this.transitionToStance = transitionTo;
             this.selfArousalGain = selfArousal;
             this.targetPenetrationSlot = targetSlot;
+            this.targetGrappleZone = targetGrapple;
         }
     }
 
@@ -339,42 +350,69 @@ namespace UnbridledSanctum.Combat
 
         [Header("Gender & Anatomical Capabilities")]
         public EntityGender gender = EntityGender.Futa;
-        public bool canPenetrate => gender == EntityGender.Futa;
+        public bool canPenetrate => true; // Both Futa and Female entities can enter intimate engagement/penetration (fingers, mouth, or phallus based on skills)
 
         [Header("Grapple & Penetration State")]
         public PenetrationSlot occupiedSlot = PenetrationSlot.None;
         public bool isGrapplingPlayer = false;
+        public GrappleZone heldGrappleZone = GrappleZone.None;
 
         public bool isPenetrating => occupiedSlot != PenetrationSlot.None;
         public bool isGrappling => isGrapplingPlayer && !isPenetrating;
 
         [Header("Prana & Semen Absorption")]
         public int semenVolumeMl = 0;
+        public int semenMouthMl = 0;
+        public const int MAX_SEMEN_MOUTH_ML = 100;
+        public int semenWombMl = 0;
+        public const int MAX_SEMEN_WOMB_ML = 200;
+        public int semenAnalMl = 0;
+        public const int MAX_SEMEN_ANAL_ML = 150;
         public int lustShield = 0;
 
-        [Header("Dual Armor & Clothes Durability")]
+        [Header("Dual Armor & Clothes Durability (Outer & Under Layers)")]
         public int upperClothesHp;
         public int maxUpperClothesHp;
         public int lowerClothesHp;
         public int maxLowerClothesHp;
+
+        public int underUpperClothesHp;
+        public int maxUnderUpperClothesHp;
+        public int underLowerClothesHp;
+        public int maxUnderLowerClothesHp;
 
         public int upperArmorBuff = 1;
         public int lowerArmorBuff = 1;
 
         public ItemData upperItem;
         public ItemData lowerItem;
-        public ItemData underwearItem;
+        public ItemData underUpperItem;
+        public ItemData underLowerItem;
+        public ItemData underwearItem; // Backward compatibility alias
         public ItemData accessoryItem;
 
         public bool isWearingCombinedClothes => upperItem != null && upperItem == lowerItem && (upperItem.IsCombinedArmor || upperItem.equipSlot == EquipSlot.CombinedClothes);
 
-        // Total clothes HP helper for backward compatibility & checks
-        public int clothesHp => isWearingCombinedClothes ? upperClothesHp : (upperClothesHp + lowerClothesHp);
-        public int maxClothesHp => isWearingCombinedClothes ? maxUpperClothesHp : (maxUpperClothesHp + maxLowerClothesHp);
+        public bool isOuterUpperTorn => upperClothesHp <= 0;
+        public bool isUnderUpperTorn => underUpperClothesHp <= 0;
+        public bool isBreastsExposed => isOuterUpperTorn && isUnderUpperTorn;
 
-        public bool isUpperTorn => upperClothesHp <= 0;
-        public bool isLowerTorn => lowerClothesHp <= 0;
-        public bool isCompletelyStripped => upperClothesHp <= 0 && lowerClothesHp <= 0;
+        public bool isOuterLowerTorn => lowerClothesHp <= 0;
+        public bool isUnderLowerTorn => underLowerClothesHp <= 0;
+        public bool isGroinExposed => isOuterLowerTorn && isUnderLowerTorn;
+
+        // Total clothes HP helper for backward compatibility & checks
+        public int clothesHp => isWearingCombinedClothes 
+            ? (upperClothesHp + underUpperClothesHp + underLowerClothesHp) 
+            : (upperClothesHp + lowerClothesHp + underUpperClothesHp + underLowerClothesHp);
+
+        public int maxClothesHp => isWearingCombinedClothes 
+            ? (maxUpperClothesHp + maxUnderUpperClothesHp + maxUnderLowerClothesHp) 
+            : (maxUpperClothesHp + maxLowerClothesHp + maxUnderUpperClothesHp + maxUnderLowerClothesHp);
+
+        public bool isUpperTorn => isBreastsExposed;
+        public bool isLowerTorn => isGroinExposed; // Penetration strictly requires groin to be exposed (panties torn)
+        public bool isCompletelyStripped => isBreastsExposed && isGroinExposed;
 
         /// <summary>
         /// Calculates stat contribution from active (intact) clothes and equipped items.
@@ -401,7 +439,17 @@ namespace UnbridledSanctum.Combat
                     total += selector(lowerItem);
             }
 
-            if (underwearItem != null && underwearItem != upperItem && underwearItem != lowerItem)
+            if (underUpperItem != null && underUpperItem != upperItem && underUpperItem != lowerItem && underUpperClothesHp > 0)
+            {
+                total += selector(underUpperItem);
+            }
+
+            if (underLowerItem != null && underLowerItem != upperItem && underLowerItem != lowerItem && underLowerItem != underUpperItem && underLowerClothesHp > 0)
+            {
+                total += selector(underLowerItem);
+            }
+
+            if (underwearItem != null && underwearItem != upperItem && underwearItem != lowerItem && underwearItem != underUpperItem && underwearItem != underLowerItem)
             {
                 total += selector(underwearItem);
             }
@@ -499,7 +547,7 @@ namespace UnbridledSanctum.Combat
 
         public event Action OnStateChanged;
 
-        public static Combatant CreatePlayer(int hp = 30, int upperDurability = 65, int lowerDurability = 65)
+        public static Combatant CreatePlayer(int hp = 30, int upperDurability = 65, int lowerDurability = 65, int underUpperDurability = 35, int underLowerDurability = 35)
         {
             Combatant c = new Combatant
             {
@@ -523,9 +571,13 @@ namespace UnbridledSanctum.Combat
                 upperClothesHp = upperDurability,
                 maxLowerClothesHp = lowerDurability,
                 lowerClothesHp = lowerDurability,
+                maxUnderUpperClothesHp = underUpperDurability,
+                underUpperClothesHp = underUpperDurability,
+                maxUnderLowerClothesHp = underLowerDurability,
+                underLowerClothesHp = underLowerDurability,
                 upperArmorBuff = 1,
                 lowerArmorBuff = 1,
-                hasArmorBuff = (upperDurability > 0 || lowerDurability > 0),
+                hasArmorBuff = (upperDurability > 0 || lowerDurability > 0 || underUpperDurability > 0 || underLowerDurability > 0),
                 seduction = 0,
                 seductionStacks = 0,
                 isFlustered = false,
@@ -600,9 +652,46 @@ namespace UnbridledSanctum.Combat
                     c.maxStamina = 30;
                     c.currentStamina = 30;
                     break;
+
+                case EnemyType.ElvenScout:
+                    c.name = "Elven Scout";
+                    c.gender = EntityGender.Female;
+                    c.maxHp = 45 + (floorLevel * 4);
+                    c.currentHp = c.maxHp;
+                    c.maxMana = 15;
+                    c.currentMana = 15;
+                    c.baseMaxStamina = 20;
+                    c.maxStamina = 20;
+                    c.currentStamina = 20;
+                    c.maxSeductionStacks = 2; // 2 phases (25 Lust each = 50 total lust threshold)
+                    c.upperClothesHp = 25;
+                    c.maxUpperClothesHp = 25;
+                    c.lowerClothesHp = 30;
+                    c.maxLowerClothesHp = 30;
+                    c.hasArmorBuff = true;
+                    break;
             }
 
             return c;
+        }
+
+        public void StripUpper()
+        {
+            upperClothesHp = 0;
+            OnStateChanged?.Invoke();
+        }
+
+        public void StripLower()
+        {
+            lowerClothesHp = 0;
+            OnStateChanged?.Invoke();
+        }
+
+        public void StripAll()
+        {
+            upperClothesHp = 0;
+            lowerClothesHp = 0;
+            OnStateChanged?.Invoke();
         }
 
         public int TakeHpDamage(int rawDamage)
@@ -673,67 +762,78 @@ namespace UnbridledSanctum.Combat
 
             int actualDamageTaken = 0;
 
-            if (isWearingCombinedClothes)
+            if (targetSlot == ArmorTargetSlot.Upper)
             {
-                // Combined clothes has a unified single HP pool.
-                // Any damage targeting Upper, Lower, or All reduces the single HP pool,
-                // keeping both upper and lower slots completely synchronized.
-                int currentHp = upperClothesHp;
-                if (currentHp > 0)
-                {
-                    int dmg = Mathf.Min(currentHp, rawDamage);
-                    upperClothesHp = currentHp - dmg;
-                    lowerClothesHp = upperClothesHp;
-                    actualDamageTaken = dmg;
-                }
-            }
-            else if (targetSlot == ArmorTargetSlot.Upper)
-            {
-                if (upperClothesHp > 0)
-                {
-                    int dmg = Mathf.Min(upperClothesHp, rawDamage);
-                    upperClothesHp -= dmg;
-                    actualDamageTaken = dmg;
-                }
+                actualDamageTaken = ApplyUpperZoneDamage(rawDamage);
             }
             else if (targetSlot == ArmorTargetSlot.Lower)
             {
-                if (lowerClothesHp > 0)
-                {
-                    int dmg = Mathf.Min(lowerClothesHp, rawDamage);
-                    lowerClothesHp -= dmg;
-                    actualDamageTaken = dmg;
-                }
+                actualDamageTaken = ApplyLowerZoneDamage(rawDamage);
             }
             else // ArmorTargetSlot.All
             {
-                if (upperClothesHp > 0 && lowerClothesHp > 0)
-                {
-                    int half = Mathf.CeilToInt(rawDamage / 2f);
-                    int dmgU = Mathf.Min(upperClothesHp, half);
-                    int dmgL = Mathf.Min(lowerClothesHp, rawDamage - half);
-                    upperClothesHp -= dmgU;
-                    lowerClothesHp -= dmgL;
-                    actualDamageTaken = dmgU + dmgL;
-                }
-                else if (upperClothesHp > 0)
-                {
-                    int dmg = Mathf.Min(upperClothesHp, rawDamage);
-                    upperClothesHp -= dmg;
-                    actualDamageTaken = dmg;
-                }
-                else if (lowerClothesHp > 0)
-                {
-                    int dmg = Mathf.Min(lowerClothesHp, rawDamage);
-                    lowerClothesHp -= dmg;
-                    actualDamageTaken = dmg;
-                }
+                int half = Mathf.CeilToInt(rawDamage / 2f);
+                actualDamageTaken = ApplyUpperZoneDamage(half) + ApplyLowerZoneDamage(rawDamage - half);
             }
 
             hasArmorBuff = CurrentArmorDamageReduction > 0;
             RecalculateStats();
             OnStateChanged?.Invoke();
             return actualDamageTaken;
+        }
+
+        private int ApplyUpperZoneDamage(int amount)
+        {
+            if (amount <= 0) return 0;
+            int taken = 0;
+
+            // 1. First line of defense: Outer Upper (or Combined suit)
+            if (upperClothesHp > 0)
+            {
+                int dmg = Mathf.Min(upperClothesHp, amount);
+                upperClothesHp -= dmg;
+                taken += dmg;
+                amount -= dmg;
+                if (isWearingCombinedClothes) lowerClothesHp = upperClothesHp;
+            }
+
+            // 2. Second line of defense: Under Upper (Bra / Lingerie)
+            if (amount > 0 && underUpperClothesHp > 0)
+            {
+                int dmg = Mathf.Min(underUpperClothesHp, amount);
+                underUpperClothesHp -= dmg;
+                taken += dmg;
+                amount -= dmg;
+            }
+
+            return taken;
+        }
+
+        private int ApplyLowerZoneDamage(int amount)
+        {
+            if (amount <= 0) return 0;
+            int taken = 0;
+
+            // 1. First line of defense: Outer Lower (or Combined suit)
+            if (lowerClothesHp > 0)
+            {
+                int dmg = Mathf.Min(lowerClothesHp, amount);
+                lowerClothesHp -= dmg;
+                taken += dmg;
+                amount -= dmg;
+                if (isWearingCombinedClothes) upperClothesHp = lowerClothesHp;
+            }
+
+            // 2. Second line of defense: Under Lower (Panties)
+            if (amount > 0 && underLowerClothesHp > 0)
+            {
+                int dmg = Mathf.Min(underLowerClothesHp, amount);
+                underLowerClothesHp -= dmg;
+                taken += dmg;
+                amount -= dmg;
+            }
+
+            return taken;
         }
 
         public int AddSeduction(int rawAmount)
@@ -812,10 +912,23 @@ namespace UnbridledSanctum.Combat
             OnStateChanged?.Invoke();
         }
 
-        public void AddSemen(int amountMl)
+        public void AddSemen(int amountMl, PenetrationSlot slot = PenetrationSlot.None)
         {
             if (amountMl <= 0) return;
             semenVolumeMl += amountMl;
+            switch (slot)
+            {
+                case PenetrationSlot.Mouth:
+                    semenMouthMl = Mathf.Min(MAX_SEMEN_MOUTH_ML, semenMouthMl + amountMl);
+                    break;
+                case PenetrationSlot.Anal:
+                    semenAnalMl = Mathf.Min(MAX_SEMEN_ANAL_ML, semenAnalMl + amountMl);
+                    break;
+                case PenetrationSlot.Vagina:
+                default:
+                    semenWombMl = Mathf.Min(MAX_SEMEN_WOMB_ML, semenWombMl + amountMl);
+                    break;
+            }
             OnStateChanged?.Invoke();
         }
 

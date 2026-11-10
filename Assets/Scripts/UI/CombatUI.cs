@@ -110,6 +110,10 @@ namespace UnbridledSanctum.UI
         public Sprite cardFrameSprite;
         public Sprite progressbarFrameSprite;
 
+        [Header("Background Skin")]
+        public Sprite combatBackgroundSprite;
+        public Image combatBackgroundImage;
+
         [Header("Top Header Actions")]
         public Button surrenderButton;
         public Button debugWinHpButton;
@@ -151,6 +155,25 @@ namespace UnbridledSanctum.UI
             }
 
             DisableButtonKeyNavigation();
+            ApplyCombatBackground();
+        }
+
+        public void ApplyCombatBackground()
+        {
+            if (combatBackgroundImage == null)
+            {
+                combatBackgroundImage = (combatPanel != null) ? combatPanel.GetComponent<Image>() : GetComponent<Image>();
+            }
+            if (combatBackgroundSprite == null)
+            {
+                combatBackgroundSprite = LoadSpriteFromPath("Location/Backgrounds/ElvenForest.png");
+            }
+            if (combatBackgroundSprite != null && combatBackgroundImage != null)
+            {
+                combatBackgroundImage.sprite = combatBackgroundSprite;
+                combatBackgroundImage.color = Color.white;
+                combatBackgroundImage.preserveAspect = false;
+            }
         }
 
         public void BindManager(CombatManager combatManager)
@@ -855,9 +878,10 @@ namespace UnbridledSanctum.UI
                 if (playerAvatarHairFront != null) playerAvatarHairFront.enabled = false;
                 SyncImg(playerAvatarAccessory, pd.accessoryImage);
 
-                // Initial clothes visibility (independent Upper and Lower)
-                bool hasUpper = manager != null && manager.player != null && manager.player.upperClothesHp > 0;
-                bool hasLower = manager != null && manager.player != null && manager.player.lowerClothesHp > 0;
+                // Initial clothes visibility (two-phase strip: Outer -> Underwear -> Exposed)
+                bool hasUpper = manager != null && manager.player != null && !manager.player.isOuterUpperTorn;
+                bool hasLower = manager != null && manager.player != null && !manager.player.isOuterLowerTorn;
+                bool hasUnderLower = manager != null && manager.player != null && !manager.player.isUnderLowerTorn;
 
                 if (playerAvatarClothes != null)
                 {
@@ -873,7 +897,7 @@ namespace UnbridledSanctum.UI
 
                 if (playerAvatarUnderwear != null)
                 {
-                    playerAvatarUnderwear.enabled = hasLower && (playerAvatarUnderwear.sprite != null);
+                    playerAvatarUnderwear.enabled = hasUnderLower && (playerAvatarUnderwear.sprite != null);
                     playerAvatarUnderwear.gameObject.SetActive(playerAvatarUnderwear.enabled);
                 }
 
@@ -2346,23 +2370,25 @@ namespace UnbridledSanctum.UI
             // Sync player combat doll layers
             if (p != null)
             {
-                bool showUpper = (p.upperClothesHp > 0 && playerAvatarClothes != null && playerAvatarClothes.sprite != null);
+                bool showUpper = (!p.isOuterUpperTorn && playerAvatarClothes != null && playerAvatarClothes.sprite != null);
                 if (playerAvatarClothes != null)
                 {
                     playerAvatarClothes.enabled = showUpper;
                     playerAvatarClothes.gameObject.SetActive(showUpper);
                 }
 
-                bool showLower = (p.lowerClothesHp > 0);
+                bool showLower = !p.isOuterLowerTorn;
                 if (playerAvatarLowerClothes != null)
                 {
                     bool active = showLower && playerAvatarLowerClothes.sprite != null;
                     playerAvatarLowerClothes.enabled = active;
                     playerAvatarLowerClothes.gameObject.SetActive(active);
                 }
+
+                bool showUnderLower = !p.isUnderLowerTorn;
                 if (playerAvatarUnderwear != null)
                 {
-                    bool active = showLower && playerAvatarUnderwear.sprite != null;
+                    bool active = showUnderLower && playerAvatarUnderwear.sprite != null;
                     playerAvatarUnderwear.enabled = active;
                     playerAvatarUnderwear.gameObject.SetActive(active);
                 }
@@ -3410,9 +3436,11 @@ namespace UnbridledSanctum.UI
                 panelObj.AddComponent<FloatingCombatText>();
             }
 
-            // Background Dimmer Image
+            // Background Image (Battle Arena Backdrop)
             Image bg = panelObj.AddComponent<Image>();
             bg.color = new Color(0.04f, 0.05f, 0.07f, 0.96f);
+            ui.combatBackgroundImage = bg;
+            ui.ApplyCombatBackground();
 
             // --- 1. Top Turn Order Header Bar & Header Action Controls ---
             GameObject topBarObj = new GameObject("TopTurnOrderBar", typeof(RectTransform));
@@ -3738,8 +3766,13 @@ namespace UnbridledSanctum.UI
             Vector2 statIconSize = new Vector2(44f, 44f);
             // 7 Stat Rows with Icon Sprites and Tooltips
             ui.playerHpText = StatRowFactory.Create(playerStatsObj.transform, StatIconDatabase.HpIcon, "HP", new Color(0.75f, 0.15f, 0.20f, 0.95f), "Health Points (HP):\nYour vital stamina. If reduced to 0, corruption activates.", "30 / 30", new Color(0.35f, 0.90f, 0.45f, 1f), tipPopup, statIconSize);
+            // Hide clothing rows from in-combat HUD (visual-first: clothing condition rendered directly on Paper Doll character avatar)
             ui.playerUpperClothesText = StatRowFactory.Create(playerStatsObj.transform, StatIconDatabase.TopArmorIcon, "U-ARM", new Color(0.20f, 0.55f, 0.85f, 0.95f), "Upper Armor (U-ARM):\nDurability of your upper garment. Protects your chest and provides damage reduction.", "65 / 65", new Color(0.40f, 0.80f, 1f, 1f), tipPopup, statIconSize);
             ui.playerLowerClothesText = StatRowFactory.Create(playerStatsObj.transform, StatIconDatabase.BottomArmorIcon, "L-ARM", new Color(0.18f, 0.45f, 0.75f, 0.95f), "Lower Armor (L-ARM):\nDurability of your lower garment. Protects your legs and modesty, and provides damage reduction.", "65 / 65", new Color(0.40f, 0.80f, 1f, 1f), tipPopup, statIconSize);
+            if (ui.playerUpperClothesText != null && ui.playerUpperClothesText.transform.parent != null)
+                ui.playerUpperClothesText.transform.parent.gameObject.SetActive(false);
+            if (ui.playerLowerClothesText != null && ui.playerLowerClothesText.transform.parent != null)
+                ui.playerLowerClothesText.transform.parent.gameObject.SetActive(false);
             ui.playerClothesText = ui.playerUpperClothesText;
             ui.playerShieldText = StatRowFactory.Create(playerStatsObj.transform, StatIconDatabase.BlockIcon, "SHD", new Color(0.12f, 0.55f, 0.65f, 0.95f), "Shield Guard:\nAbsorbs incoming physical damage before Health is affected.", "0", new Color(0.40f, 0.90f, 1f, 1f), tipPopup, statIconSize);
             ui.playerSeductionText = StatRowFactory.Create(playerStatsObj.transform, StatIconDatabase.LustIcon, "LUST", new Color(0.75f, 0.20f, 0.55f, 0.95f), "Lust / Seduction:\nReaching 100% triggers climax submission and adds a Climax stack!", "0%  (0/3)", new Color(1f, 0.45f, 0.75f, 1f), tipPopup, statIconSize);
@@ -4133,6 +4166,19 @@ namespace UnbridledSanctum.UI
         {
 #if UNITY_EDITOR
             string path = $"Assets/sprites/UI/{fileName}";
+            Sprite spr = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>(path);
+            if (spr != null) return spr;
+            UnityEditor.AssetDatabase.ImportAsset(path, UnityEditor.ImportAssetOptions.ForceUpdate);
+            return UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>(path);
+#else
+            return null;
+#endif
+        }
+
+        private static Sprite LoadSpriteFromPath(string relativePath)
+        {
+#if UNITY_EDITOR
+            string path = $"Assets/sprites/{relativePath}";
             Sprite spr = UnityEditor.AssetDatabase.LoadAssetAtPath<Sprite>(path);
             if (spr != null) return spr;
             UnityEditor.AssetDatabase.ImportAsset(path, UnityEditor.ImportAssetOptions.ForceUpdate);

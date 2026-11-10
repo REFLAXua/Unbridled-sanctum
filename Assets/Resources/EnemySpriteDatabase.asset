@@ -40,3 +40,8 @@ MonoBehaviour:
     lustSuprised: {fileID: 0}
     lustIntence: {fileID: 21300000, guid: 26e0199586c803faa4da96db040002f6, type: 3}
     lustEstasy: {fileID: 21300000, guid: 9fa36c1aa1a854efe8573065029832f4, type: 3}
+  elvenScout:
+    enemyType: 2
+    baseBody: {fileID: 21300000, guid: 258d99941183479bb0f39efc5ff0ed78, type: 3}
+    upperClothes: {fileID: 21300000, guid: 91cf904a9ab34332b0efd3ec39e9abb5, type: 3}
+    lowerClothes: {fileID: 21300000, guid: a49c1a991fc94f55aec0f6bfcc8a6e82, type: 3}

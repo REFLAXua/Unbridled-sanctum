@@ -480,7 +480,7 @@ public class ExpeditionMapUI : MonoBehaviour
             int count = (currentFloor.floorNumber <= 1) ? UnityEngine.Random.Range(1, 3) : UnityEngine.Random.Range(2, 4);
             for (int i = 0; i < count; i++)
             {
-                list.Add(UnityEngine.Random.value < 0.55f ? EnemyType.SlimeGirl : EnemyType.Succubus);
+                list.Add(EnemyType.ElvenScout);
             }
             Hide();
             combatManager.StartCombat(list, currentFloor.floorNumber);
@@ -830,11 +830,49 @@ public class ExpeditionMapUI : MonoBehaviour
         expUI.playerHpText = StatRowFactory.Create(statsObj.transform, StatIconDatabase.HpIcon, "HP", new Color(0.75f, 0.15f, 0.20f, 0.95f), "Health Points (HP):\nYour vital stamina. If reduced to 0, corruption activates.", "30 / 30", new Color(0.35f, 0.90f, 0.45f, 1f), tipPopup, statIconSize);
         expUI.playerUpperClothesText = StatRowFactory.Create(statsObj.transform, StatIconDatabase.TopArmorIcon, "U-ARM", new Color(0.20f, 0.55f, 0.85f, 0.95f), "Upper Armor (U-ARM):\nDurability of your upper garment. Protects your chest and provides damage reduction.", "65 / 65", new Color(0.40f, 0.80f, 1f, 1f), tipPopup, statIconSize);
         expUI.playerLowerClothesText = StatRowFactory.Create(statsObj.transform, StatIconDatabase.BottomArmorIcon, "L-ARM", new Color(0.18f, 0.45f, 0.75f, 0.95f), "Lower Armor (L-ARM):\nDurability of your lower garment. Protects your modesty and legs, and provides damage reduction.", "65 / 65", new Color(0.40f, 0.80f, 1f, 1f), tipPopup, statIconSize);
+        if (expUI.playerUpperClothesText != null && expUI.playerUpperClothesText.transform.parent != null)
+            expUI.playerUpperClothesText.transform.parent.gameObject.SetActive(false);
+        if (expUI.playerLowerClothesText != null && expUI.playerLowerClothesText.transform.parent != null)
+            expUI.playerLowerClothesText.transform.parent.gameObject.SetActive(false);
         expUI.playerClothesText = expUI.playerUpperClothesText;
         expUI.playerShieldText = StatRowFactory.Create(statsObj.transform, StatIconDatabase.BlockIcon, "SHD", new Color(0.12f, 0.55f, 0.65f, 0.95f), "Shield Guard:\nAbsorbs incoming physical damage before Health is affected.", "0", new Color(0.40f, 0.90f, 1f, 1f), tipPopup, statIconSize);
         expUI.playerLustText = StatRowFactory.Create(statsObj.transform, StatIconDatabase.LustIcon, "LUST", new Color(0.75f, 0.20f, 0.55f, 0.95f), "Lust / Seduction:\nReaching 100% triggers climax submission and adds a Climax stack!", "0%  (0/3)", new Color(1f, 0.45f, 0.75f, 1f), tipPopup, statIconSize);
         expUI.playerCorruptionText = StatRowFactory.Create(statsObj.transform, StatIconDatabase.CorruptionIcon, "CORR", new Color(0.50f, 0.15f, 0.65f, 0.95f), "Corruption:\nDefeat adds +1 Corruption and preserves you with 1 HP. If it reaches 3/3, you are fully consumed!", "0 / 3", new Color(0.85f, 0.45f, 0.95f, 1f), tipPopup, statIconSize);
         expUI.playerLumieresText = StatRowFactory.Create(statsObj.transform, StatIconDatabase.LumiereIcon, "LUM", new Color(0.85f, 0.65f, 0.15f, 0.95f), "Lumieres:\nRun currency gathered from battles, chests, and cavern events. Converted into Lustid upon returning to Sanctuary.", "0", new Color(1f, 0.88f, 0.35f, 1f), tipPopup, statIconSize);
+
+        // Character Profile Button [TAB]
+        GameObject profileBtnObj = new GameObject("ProfileButton", typeof(RectTransform));
+        profileBtnObj.transform.SetParent(statsObj.transform, false);
+        Image profBtnBg = profileBtnObj.AddComponent<Image>();
+        profBtnBg.color = new Color(0.20f, 0.40f, 0.65f, 0.95f);
+        Button profBtn = profileBtnObj.AddComponent<Button>();
+        profBtn.targetGraphic = profBtnBg;
+        ColorBlock pcb = profBtn.colors;
+        pcb.normalColor = new Color(0.20f, 0.40f, 0.65f, 0.95f);
+        pcb.highlightedColor = new Color(0.35f, 0.65f, 0.95f, 1f);
+        pcb.pressedColor = new Color(0.15f, 0.30f, 0.50f, 1f);
+        pcb.fadeDuration = 0.08f;
+        profBtn.colors = pcb;
+        profBtn.onClick.AddListener(() =>
+        {
+            if (CharacterProfileUI.Instance != null) CharacterProfileUI.Instance.Open(0);
+        });
+
+        RectTransform pbrt = profileBtnObj.GetComponent<RectTransform>();
+        pbrt.sizeDelta = new Vector2(240f, 44f);
+
+        GameObject pBtnTxtObj = new GameObject("Text", typeof(RectTransform));
+        pBtnTxtObj.transform.SetParent(profileBtnObj.transform, false);
+        TextMeshProUGUI pbtTxt = pBtnTxtObj.AddComponent<TextMeshProUGUI>();
+        pbtTxt.fontSize = 15;
+        pbtTxt.fontStyle = FontStyles.Bold;
+        pbtTxt.alignment = TextAlignmentOptions.Center;
+        pbtTxt.text = "<color=#FFEEDD>[TAB] VESSEL STATUS</color>";
+        RectTransform pbtrt = pBtnTxtObj.GetComponent<RectTransform>();
+        pbtrt.anchorMin = Vector2.zero;
+        pbtrt.anchorMax = Vector2.one;
+        pbtrt.offsetMin = Vector2.zero;
+        pbtrt.offsetMax = Vector2.zero;
 
         // Surrender Button (Top Right)
         GameObject surrObj = new GameObject("SurrenderButton", typeof(RectTransform));

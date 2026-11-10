@@ -209,34 +209,29 @@ namespace UnbridledSanctum.UI
 
             if (cleanTitle.IndexOf("Spring", StringComparison.OrdinalIgnoreCase) >= 0)
             {
-                // Slime encounter at the azure healing spring
-                DialogueSequence seq = new DialogueSequence("event_spring", EnemyType.SlimeGirl, 0, hasEnemy: true);
-                seq.AddLine(DialogueSpeaker.Narrator, "Mystic Spring", "You discover a secluded cavern grotto where warm, translucent azure liquid gently bubbles into a crystalline basin.", "Normal", "smile");
-                seq.AddLine(DialogueSpeaker.NPC, "Slime Maiden", "Hehe! Hello traveler! Looking for a quick dip? The minerals here soothe weary muscles and melt away fatigue!", "Smile", "smile");
-                seq.AddLine(DialogueSpeaker.Player, "You", "It looks peaceful. A momentary respite in these dark depths is a rare blessing.", "Smile", "smile");
-                seq.AddLine(DialogueSpeaker.NPC, "Slime Maiden", "Go on, splash some on your face! It tingles with rejuvenating mana! Just don't drink too much, or you'll get bouncy!", "Delighted", "grin");
-                seq.AddLine(DialogueSpeaker.Narrator, "Mystic Spring", "You bathed your face and hands in the warm waters, feeling vitality seep back into your body (+15 HP, clothes refreshed).", "Delighted", "smile");
+                // Elven grove spring
+                DialogueSequence seq = new DialogueSequence("event_spring", EnemyType.ElvenScout, 0, hasEnemy: false);
+                seq.AddLine(DialogueSpeaker.Narrator, "Enchanted Spring", "You discover a secluded glade where pure emerald spring water bubbles gently over ancient elven stones.", "Normal");
+                seq.AddLine(DialogueSpeaker.Player, "You", "The water sparkles with tranquil vitality. A brief respite under the ancient canopy.", "Smile");
+                seq.AddLine(DialogueSpeaker.Narrator, "Enchanted Spring", "Drinking deeply and washing the trail dust from your skin restores vitality (+15 HP, clothes refreshed).", "Delighted");
                 return seq;
             }
             else if (cleanTitle.IndexOf("Stele", StringComparison.OrdinalIgnoreCase) >= 0 || cleanTitle.IndexOf("Obelisk", StringComparison.OrdinalIgnoreCase) >= 0)
             {
-                // Succubus phantom at ancient stele
-                DialogueSequence seq = new DialogueSequence("event_stele", EnemyType.Succubus, 0, hasEnemy: true);
-                seq.AddLine(DialogueSpeaker.Narrator, "Ancient Stele", "An ancient basalt monolith looms before you, pulsating with crimson demonic inscriptions of a forgotten age.", "Normal", "smile");
-                seq.AddLine(DialogueSpeaker.NPC, "Abyssal Echo", "Mmm... drawn to forbidden knowledge, little moth? The sigils etched here whisper of boundless power and carnal secrets.", "Shocked", "smile");
-                seq.AddLine(DialogueSpeaker.Player, "You", "Who's there?! An apparition? The whispers... they resonate directly inside my mind.", "Shocked", "smile");
-                seq.AddLine(DialogueSpeaker.NPC, "Abyssal Echo", "Just an echo of desire left behind in stone. Dare you trace the glyph with your bare finger?", "Smile", "grin");
-                seq.AddLine(DialogueSpeaker.Player, "You", "I will decipher your arcane secrets without succumbing to your deceit.", "Smug", "annoyed");
-                seq.AddLine(DialogueSpeaker.Narrator, "Ancient Stele", "Deciphering the cryptic demonic runes granted you deep arcane focus and insight (+35 Lumieres, Mana replenished).", "Normal", "grin");
+                // Ancient Elven Monolith
+                DialogueSequence seq = new DialogueSequence("event_stele", EnemyType.ElvenScout, 0, hasEnemy: false);
+                seq.AddLine(DialogueSpeaker.Narrator, "Verdant Monolith", "An ancient moss-covered stone pillar rises between towering roots, radiating faint primordial essence.", "Normal");
+                seq.AddLine(DialogueSpeaker.Player, "You", "Ancient elven runes... they speak of an endless fertility ritual and reverence for life.", "Shocked");
+                seq.AddLine(DialogueSpeaker.Narrator, "Verdant Monolith", "Meditating before the sacred glyphs sharpens your mind and replenishes your reserves (+35 Lumieres, Mana replenished).", "Normal");
                 return seq;
             }
             else
             {
-                // General dungeon exploration event (Abandoned Camp / Glowing Fungi)
-                DialogueSequence seq = new DialogueSequence("event_camp", EnemyType.SlimeGirl, 0, hasEnemy: false);
-                seq.AddLine(DialogueSpeaker.Narrator, "Cavern Alcove", "You step into a quiet rocky nook illuminated by patches of ethereal bioluminescent moss.", "Normal");
-                seq.AddLine(DialogueSpeaker.Player, "You", "The air here is cool and still. It feels safe to pause and catch my breath for a moment.", "Smile");
-                seq.AddLine(DialogueSpeaker.Narrator, "Cavern Alcove", "Searching the hollowed alcove, you uncover an abandoned explorer's pouch containing pristine bandages and supplies (+20 Lumieres).", "Delighted");
+                // General forest exploration
+                DialogueSequence seq = new DialogueSequence("event_camp", EnemyType.ElvenScout, 0, hasEnemy: false);
+                seq.AddLine(DialogueSpeaker.Narrator, "Canopy Alcove", "You find shelter beneath the arched roots of a massive golden oak.", "Normal");
+                seq.AddLine(DialogueSpeaker.Player, "You", "The rustle of leaves masks the forest sounds. Time to catch my breath.", "Smile");
+                seq.AddLine(DialogueSpeaker.Narrator, "Canopy Alcove", "Foraging through the roots, you uncover dried rations and fragrant elven herbs (+20 Lumieres).", "Delighted");
                 return seq;
             }
         }

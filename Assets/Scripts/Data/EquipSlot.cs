@@ -7,9 +7,12 @@ public enum EquipSlot
     CombinedClothes = 0,
     UpperClothes = 1,
     LowerClothes = 2,
-    Underwear = 3,
-    Accessory = 4,
+    UnderUpper = 3,   // Bra / Top Underwear
+    UnderLower = 4,   // Panties / Bottom Underwear
+    Accessory = 5,
 
+    [System.Obsolete("Use UnderUpper or UnderLower")]
+    Underwear = 4,
     [System.Obsolete("Use CombinedClothes, UpperClothes, or LowerClothes")]
     Clothes = 0
 }

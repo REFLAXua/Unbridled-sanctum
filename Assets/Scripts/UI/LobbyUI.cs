@@ -1385,6 +1385,12 @@ public class LobbyUI : MonoBehaviour
     public void OpenWardrobeOverlay()
     {
         CloseActiveOverlay(suppressPaperDollHide: true);
+        if (CharacterProfileUI.Instance != null)
+        {
+            CharacterProfileUI.Instance.Open(1); // Open Wardrobe & Inventory Tab
+            return;
+        }
+
         if (wardrobeOverlay != null)
         {
             wardrobeOverlay.SetActive(true);

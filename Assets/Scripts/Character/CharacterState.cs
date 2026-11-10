@@ -215,6 +215,12 @@ public class CharacterState : MonoBehaviour
             return null;
         }
 
+        if (slot == EquipSlot.Underwear)
+        {
+            if (equippedItems.TryGetValue(EquipSlot.UnderLower, out ItemData uLower) && uLower != null) return uLower;
+            if (equippedItems.TryGetValue(EquipSlot.UnderUpper, out ItemData uUpper) && uUpper != null) return uUpper;
+        }
+
         equippedItems.TryGetValue(slot, out ItemData item);
         return item;
     }
