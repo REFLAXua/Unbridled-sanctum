@@ -2879,6 +2879,10 @@ namespace UnbridledSanctum.UI
             // 3. Full-Height Character Sprite (Standing freely, NO card box, NO mask!)
             GameObject pSpriteObj = new GameObject("FullBodySprite", typeof(RectTransform));
             pSpriteObj.transform.SetParent(cardObj.transform, false);
+            AspectRatioFitter arf = pSpriteObj.AddComponent<AspectRatioFitter>();
+            arf.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
+            arf.aspectRatio = 1024f / 1536f;
+
             Image pImg = pSpriteObj.AddComponent<Image>();
             pImg.preserveAspect = true;
             pImg.raycastTarget = false;

@@ -337,6 +337,9 @@ namespace UnbridledSanctum.UI
         {
             if (portraitImage == null) return;
 
+            portraitImage.preserveAspect = true;
+            portraitImage.type = Image.Type.Simple;
+
             if (lowerClothesOverlay == null)
             {
                 Transform existing = portraitImage.transform.Find("LowerClothesOverlay");
@@ -348,14 +351,22 @@ namespace UnbridledSanctum.UI
                 {
                     GameObject go = new GameObject("LowerClothesOverlay", typeof(RectTransform), typeof(Image));
                     go.transform.SetParent(portraitImage.transform, false);
-                    RectTransform rt = go.GetComponent<RectTransform>();
-                    rt.anchorMin = Vector2.zero;
-                    rt.anchorMax = Vector2.one;
-                    rt.sizeDelta = Vector2.zero;
-                    rt.anchoredPosition = Vector2.zero;
                     lowerClothesOverlay = go.GetComponent<Image>();
-                    lowerClothesOverlay.raycastTarget = false;
                 }
+            }
+
+            if (lowerClothesOverlay != null)
+            {
+                lowerClothesOverlay.raycastTarget = false;
+                lowerClothesOverlay.preserveAspect = true;
+                lowerClothesOverlay.type = Image.Type.Simple;
+                RectTransform rt = lowerClothesOverlay.rectTransform;
+                rt.anchorMin = Vector2.zero;
+                rt.anchorMax = Vector2.one;
+                rt.offsetMin = Vector2.zero;
+                rt.offsetMax = Vector2.zero;
+                rt.anchoredPosition = Vector2.zero;
+                rt.sizeDelta = Vector2.zero;
             }
 
             if (upperClothesOverlay == null)
@@ -369,14 +380,22 @@ namespace UnbridledSanctum.UI
                 {
                     GameObject go = new GameObject("UpperClothesOverlay", typeof(RectTransform), typeof(Image));
                     go.transform.SetParent(portraitImage.transform, false);
-                    RectTransform rt = go.GetComponent<RectTransform>();
-                    rt.anchorMin = Vector2.zero;
-                    rt.anchorMax = Vector2.one;
-                    rt.sizeDelta = Vector2.zero;
-                    rt.anchoredPosition = Vector2.zero;
                     upperClothesOverlay = go.GetComponent<Image>();
-                    upperClothesOverlay.raycastTarget = false;
                 }
+            }
+
+            if (upperClothesOverlay != null)
+            {
+                upperClothesOverlay.raycastTarget = false;
+                upperClothesOverlay.preserveAspect = true;
+                upperClothesOverlay.type = Image.Type.Simple;
+                RectTransform rt = upperClothesOverlay.rectTransform;
+                rt.anchorMin = Vector2.zero;
+                rt.anchorMax = Vector2.one;
+                rt.offsetMin = Vector2.zero;
+                rt.offsetMax = Vector2.zero;
+                rt.anchoredPosition = Vector2.zero;
+                rt.sizeDelta = Vector2.zero;
             }
         }
 
@@ -390,15 +409,18 @@ namespace UnbridledSanctum.UI
                 EnsureModularOverlaysExist();
                 portraitImage.sprite = baseSp;
                 portraitImage.enabled = true;
+                portraitImage.preserveAspect = true;
 
                 if (lowerClothesOverlay != null)
                 {
                     lowerClothesOverlay.sprite = bottomSp;
+                    lowerClothesOverlay.preserveAspect = true;
                     lowerClothesOverlay.gameObject.SetActive(!assignedEnemy.isLowerTorn);
                 }
                 if (upperClothesOverlay != null)
                 {
                     upperClothesOverlay.sprite = topSp;
+                    upperClothesOverlay.preserveAspect = true;
                     upperClothesOverlay.gameObject.SetActive(!assignedEnemy.isUpperTorn);
                 }
             }
