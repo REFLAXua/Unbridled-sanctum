@@ -142,7 +142,29 @@ public class GameUIManager : MonoBehaviour
             combatUI = canvasTrans.GetComponentInChildren<CombatUI>(true);
             if (combatUI == null)
             {
-                combatUI = CombatUI.CreateDynamic(canvasTrans, combatManager);
+                // Check if baked prefab exists in Resources/Prefabs
+                GameObject prefab = Resources.Load<GameObject>("Prefabs/CombatPanel");
+                if (prefab == null)
+                {
+#if UNITY_EDITOR
+                    prefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/UI/CombatPanel.prefab");
+#endif
+                }
+
+                if (prefab != null)
+                {
+                    GameObject instantiated = Instantiate(prefab, canvasTrans, false);
+                    combatUI = instantiated.GetComponent<CombatUI>();
+                    if (combatUI != null)
+                    {
+                        combatUI.BindManager(combatManager);
+                    }
+                }
+
+                if (combatUI == null)
+                {
+                    combatUI = CombatUI.CreateDynamic(canvasTrans, combatManager);
+                }
             }
         }
 

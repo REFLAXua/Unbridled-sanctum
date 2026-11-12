@@ -1298,29 +1298,28 @@ public class LobbyUI : MonoBehaviour
             }
         }
 
-        // 3.5 Deck category filter buttons
+        // 3.5 Stance sub-deck tabs (Neutral, Grapple, Sex)
         if (filterAllBtn != null)
         {
-            filterAllBtn.onClick.RemoveAllListeners();
-            filterAllBtn.onClick.AddListener(() => SetDeckCategoryFilter(DeckCategoryFilter.All));
+            filterAllBtn.gameObject.SetActive(false);
         }
 
         if (filterTacticsBtn != null)
         {
             filterTacticsBtn.onClick.RemoveAllListeners();
-            filterTacticsBtn.onClick.AddListener(() => SetDeckCategoryFilter(DeckCategoryFilter.WarriorTactics));
-        }
-
-        if (filterLustBtn != null)
-        {
-            filterLustBtn.onClick.RemoveAllListeners();
-            filterLustBtn.onClick.AddListener(() => SetDeckCategoryFilter(DeckCategoryFilter.LustInstincts));
+            filterTacticsBtn.onClick.AddListener(() => SetStanceTab(CardStanceCategory.Neutral));
         }
 
         if (filterStruggleBtn != null)
         {
             filterStruggleBtn.onClick.RemoveAllListeners();
-            filterStruggleBtn.onClick.AddListener(() => SetDeckCategoryFilter(DeckCategoryFilter.StruggleActions));
+            filterStruggleBtn.onClick.AddListener(() => SetStanceTab(CardStanceCategory.Grapple));
+        }
+
+        if (filterLustBtn != null)
+        {
+            filterLustBtn.onClick.RemoveAllListeners();
+            filterLustBtn.onClick.AddListener(() => SetStanceTab(CardStanceCategory.Sex));
         }
 
         // 4. Desire Tree page buttons
@@ -1967,11 +1966,24 @@ public class LobbyUI : MonoBehaviour
     // DECKBUILDER
     // =========================================================================
 
-    public void SetDeckCategoryFilter(DeckCategoryFilter filter)
+    public CardStanceCategory currentStanceTab = CardStanceCategory.Neutral;
+
+    public void SetStanceTab(CardStanceCategory tab)
     {
-        currentDeckCategoryFilter = filter;
+        currentStanceTab = tab;
         UpdateFilterButtonsUI();
         RefreshDeck();
+    }
+
+    public void SetDeckCategoryFilter(DeckCategoryFilter filter)
+    {
+        switch (filter)
+        {
+            case DeckCategoryFilter.WarriorTactics: SetStanceTab(CardStanceCategory.Neutral); break;
+            case DeckCategoryFilter.StruggleActions: SetStanceTab(CardStanceCategory.Grapple); break;
+            case DeckCategoryFilter.LustInstincts: SetStanceTab(CardStanceCategory.Sex); break;
+            default: SetStanceTab(CardStanceCategory.Neutral); break;
+        }
     }
 
     public void UpdateFilterButtonsUI()
@@ -1983,7 +1995,9 @@ public class LobbyUI : MonoBehaviour
         Color activeTxt = new Color(1.0f, 0.92f, 0.65f, 1f);
         Color inactiveTxt = new Color(0.85f, 0.82f, 0.75f, 1f);
 
-        Image[] bgs = { filterAllBg, filterTacticsBg, filterLustBg, filterStruggleBg };
+        if (filterAllBtn != null) filterAllBtn.gameObject.SetActive(false);
+
+        Image[] bgs = { filterTacticsBg, filterStruggleBg, filterLustBg };
         foreach (var bg in bgs)
         {
             if (bg != null && woodButtonSprite != null && bg.sprite != woodButtonSprite)
@@ -1993,17 +2007,18 @@ public class LobbyUI : MonoBehaviour
             }
         }
 
-        if (filterAllBg != null) filterAllBg.color = (currentDeckCategoryFilter == DeckCategoryFilter.All) ? activeBg : inactiveBg;
-        if (filterAllText != null) filterAllText.color = (currentDeckCategoryFilter == DeckCategoryFilter.All) ? activeTxt : inactiveTxt;
+        if (filterTacticsText != null) filterTacticsText.text = "1. NEUTRAL";
+        if (filterStruggleText != null) filterStruggleText.text = "2. GRAPPLE";
+        if (filterLustText != null) filterLustText.text = "3. SEX";
 
-        if (filterTacticsBg != null) filterTacticsBg.color = (currentDeckCategoryFilter == DeckCategoryFilter.WarriorTactics) ? activeBg : inactiveBg;
-        if (filterTacticsText != null) filterTacticsText.color = (currentDeckCategoryFilter == DeckCategoryFilter.WarriorTactics) ? activeTxt : inactiveTxt;
+        if (filterTacticsBg != null) filterTacticsBg.color = (currentStanceTab == CardStanceCategory.Neutral) ? activeBg : inactiveBg;
+        if (filterTacticsText != null) filterTacticsText.color = (currentStanceTab == CardStanceCategory.Neutral) ? activeTxt : inactiveTxt;
 
-        if (filterLustBg != null) filterLustBg.color = (currentDeckCategoryFilter == DeckCategoryFilter.LustInstincts) ? activeBg : inactiveBg;
-        if (filterLustText != null) filterLustText.color = (currentDeckCategoryFilter == DeckCategoryFilter.LustInstincts) ? activeTxt : inactiveTxt;
+        if (filterStruggleBg != null) filterStruggleBg.color = (currentStanceTab == CardStanceCategory.Grapple) ? activeBg : inactiveBg;
+        if (filterStruggleText != null) filterStruggleText.color = (currentStanceTab == CardStanceCategory.Grapple) ? activeTxt : inactiveTxt;
 
-        if (filterStruggleBg != null) filterStruggleBg.color = (currentDeckCategoryFilter == DeckCategoryFilter.StruggleActions) ? activeBg : inactiveBg;
-        if (filterStruggleText != null) filterStruggleText.color = (currentDeckCategoryFilter == DeckCategoryFilter.StruggleActions) ? activeTxt : inactiveTxt;
+        if (filterLustBg != null) filterLustBg.color = (currentStanceTab == CardStanceCategory.Sex) ? activeBg : inactiveBg;
+        if (filterLustText != null) filterLustText.color = (currentStanceTab == CardStanceCategory.Sex) ? activeTxt : inactiveTxt;
     }
 
     public void RefreshDeck()
@@ -2012,22 +2027,21 @@ public class LobbyUI : MonoBehaviour
         var cm = CombatManager.Instance;
         UpdateFilterButtonsUI();
 
-        HashSet<string> equippedCardIds = new HashSet<string>();
-        if (cm.baseWarriorDeck != null)
-        {
-            for (int i = cm.baseWarriorDeck.Count - 1; i >= 0; i--)
-            {
-                if (cm.baseWarriorDeck[i] == null || !equippedCardIds.Add(cm.baseWarriorDeck[i].id))
-                {
-                    cm.baseWarriorDeck.RemoveAt(i);
-                }
-            }
-        }
+        List<CardData> activeStanceDeck = cm.GetDeckForStance(currentStanceTab);
+        int maxSlots = cm.GetMaxSlotsForStance(currentStanceTab);
 
         if (deckCountText != null)
         {
-            deckCountText.text = $"Active Deck: {cm.baseWarriorDeck.Count} / {CombatManager.MAX_DECK_SIZE} Cards";
+            deckCountText.text = $"[{currentStanceTab.ToString().ToUpper()} STANCE] Equipped: {activeStanceDeck.Count} / {maxSlots} Slots";
         }
+
+        HashSet<string> equippedInCurrentStance = new HashSet<string>();
+        foreach (var c in activeStanceDeck)
+        {
+            if (c != null) equippedInCurrentStance.Add(c.id);
+        }
+
+        var dtm = DesireTreeManager.Instance ?? DesireTreeManager.EnsureExists();
 
         List<CardData> availableCards = new List<CardData>();
         HashSet<string> seenAvailableIds = new HashSet<string>();
@@ -2036,31 +2050,29 @@ public class LobbyUI : MonoBehaviour
             for (int i = 0; i < cm.unlockedCards.Count; i++)
             {
                 CardData cd = cm.unlockedCards[i];
-                if (cd != null && !equippedCardIds.Contains(cd.id) && seenAvailableIds.Add(cd.id))
+                if (cd != null && !equippedInCurrentStance.Contains(cd.id) && seenAvailableIds.Add(cd.id))
                 {
-                    if (currentDeckCategoryFilter == DeckCategoryFilter.WarriorTactics && cd.category != CardCategory.WarriorTactics)
-                        continue;
-                    if (currentDeckCategoryFilter == DeckCategoryFilter.LustInstincts && cd.category != CardCategory.LustInstinct)
-                        continue;
-                    if (currentDeckCategoryFilter == DeckCategoryFilter.StruggleActions && cd.category != CardCategory.StruggleAction)
+                    // Strict separation: Only show cards matching this stance sub-deck!
+                    if (cd.GetStanceCategory() != currentStanceTab)
                         continue;
 
-                    if (cd.category == CardCategory.LustInstinct)
+                    if (cd.category == CardCategory.LustInstinct && cd.requiredPath != LustPathType.None)
                     {
-                        if (cd.requiredPath != LustPathType.None && cd.requiredPath != cm.activeLustPath)
+                        if (cd.requiredPath != cm.activeLustPath && !dtm.IsCardUnlocked(cd.id))
                             continue;
                     }
+
                     availableCards.Add(cd);
                 }
             }
         }
 
-        if (selectedCollectionCard == null || (!availableCards.Contains(selectedCollectionCard) && !equippedCardIds.Contains(selectedCollectionCard.id)))
+        if (selectedCollectionCard == null || (!availableCards.Contains(selectedCollectionCard) && !equippedInCurrentStance.Contains(selectedCollectionCard.id)))
         {
-            if (availableCards.Count > 0)
+            if (activeStanceDeck.Count > 0 && activeStanceDeck[0] != null)
+                selectedCollectionCard = activeStanceDeck[0];
+            else if (availableCards.Count > 0)
                 selectedCollectionCard = availableCards[0];
-            else if (cm.baseWarriorDeck.Count > 0 && cm.baseWarriorDeck[0] != null)
-                selectedCollectionCard = cm.baseWarriorDeck[0];
             else
                 selectedCollectionCard = null;
         }
@@ -2070,6 +2082,7 @@ public class LobbyUI : MonoBehaviour
             UpdateCardDetailPanel(selectedCollectionCard);
         }
 
+        // Render Available Cards (Collection)
         if (availableCardsContainer != null)
         {
             foreach (Transform child in availableCardsContainer) Destroy(child.gameObject);
@@ -2094,14 +2107,15 @@ public class LobbyUI : MonoBehaviour
             }
         }
 
+        // Render Active Stance Sub-Deck (Bottom bar)
         if (activeDeckContainer != null)
         {
             foreach (Transform child in activeDeckContainer) Destroy(child.gameObject);
 
-            for (int i = 0; i < cm.baseWarriorDeck.Count; i++)
+            for (int i = 0; i < activeStanceDeck.Count; i++)
             {
                 int index = i;
-                CardData cardData = cm.baseWarriorDeck[i];
+                CardData cardData = activeStanceDeck[i];
                 bool isSelected = (cardData == selectedCollectionCard);
                 CreateVisualCard(
                     activeDeckContainer,
@@ -2118,7 +2132,7 @@ public class LobbyUI : MonoBehaviour
                 );
             }
 
-            for (int s = cm.baseWarriorDeck.Count; s < CombatManager.MAX_DECK_SIZE; s++)
+            for (int s = activeStanceDeck.Count; s < maxSlots; s++)
             {
                 CreateEmptySlotCard(activeDeckContainer, new Vector2(102f, 148f));
             }
@@ -2190,13 +2204,11 @@ public class LobbyUI : MonoBehaviour
 
         if (detailCardDescText != null)
         {
-            if (card.category == CardCategory.LustInstinct)
+            var dtm = DesireTreeManager.Instance ?? DesireTreeManager.EnsureExists();
+            bool isTreeLocked = (card.category == CardCategory.LustInstinct && !dtm.IsCardUnlocked(card.id));
+            if (isTreeLocked)
             {
-                detailCardDescText.text = $"{card.description}\n\n<color=#FF77DD><b>• DESIRE INSTINCT RULE:</b></color>\n<size=18><color=#DDC0E8>Automatically drawn into your hand based on Lust Stages:\n• <b>Stage 0:</b> 0 Lust cards drawn (Calm composure)\n• <b>Stage 1:</b> +1 Lust card drawn in combat hand\n• <b>Stage 2:</b> +2 Lust cards drawn (Lust cards cost -1 AP)\n• <b>Stage 3:</b> Climax Defeat (Ecstatic overload)</color></size>";
-            }
-            else if (card.category == CardCategory.StruggleAction)
-            {
-                detailCardDescText.text = $"{card.description}\n\n<color=#F5A623><b>• STRUGGLE ACTION RULE:</b></color>\n<size=18><color=#E8D5C0>Automatically replaces weapon strikes in your hand while trapped in Grapple or Penetration holds.</color></size>";
+                detailCardDescText.text = $"<color=#8895B0><i>[LOCKED IN DESIRE TREE — Unlock Node with Lustid]</i></color>\n\n{card.description}";
             }
             else
             {
@@ -2206,82 +2218,90 @@ public class LobbyUI : MonoBehaviour
 
         if (detailEquipBtn != null)
         {
+            detailEquipBtn.onClick.RemoveAllListeners();
             var dtm = DesireTreeManager.Instance ?? DesireTreeManager.EnsureExists();
-            if (card.category == CardCategory.LustInstinct)
+            var cm = CombatManager.Instance;
+            List<CardData> activeStanceDeck = cm != null ? cm.GetDeckForStance(currentStanceTab) : new List<CardData>();
+            int maxSlots = cm != null ? cm.GetMaxSlotsForStance(currentStanceTab) : 3;
+
+            bool isCurrentlyEquipped = activeStanceDeck.Exists(c => c != null && c.id == card.id);
+            bool isTreeLocked = (card.category == CardCategory.LustInstinct && !dtm.IsCardUnlocked(card.id));
+
+            if (woodButtonSprite == null) woodButtonSprite = LoadUISprite("ui_button.png");
+            if (detailEquipBtnBg != null && woodButtonSprite != null && detailEquipBtnBg.sprite != woodButtonSprite)
             {
-                detailEquipBtn.interactable = false;
-                bool isUnlockedInTree = dtm.IsCardUnlocked(card.id);
-                if (isUnlockedInTree)
-                {
-                    if (detailEquipBtnText != null) detailEquipBtnText.text = "DESIRE INSTINCT (Drawn at Stage 1 & 2)";
-                    if (detailEquipBtnBg != null) detailEquipBtnBg.color = new Color(0.55f, 0.22f, 0.50f, 0.85f);
-                }
-                else
-                {
-                    if (detailEquipBtnText != null) detailEquipBtnText.text = "LOCKED IN SACRED TREE (Awaken Node)";
-                    if (detailEquipBtnBg != null) detailEquipBtnBg.color = new Color(0.30f, 0.25f, 0.35f, 0.70f);
-                }
+                detailEquipBtnBg.sprite = woodButtonSprite;
+                detailEquipBtnBg.type = Image.Type.Sliced;
             }
-            else if (card.category == CardCategory.StruggleAction)
+
+            if (isCurrentlyEquipped)
+            {
+                detailEquipBtn.interactable = true;
+                if (detailEquipBtnText != null)
+                {
+                    detailEquipBtnText.text = $"REMOVE FROM {currentStanceTab.ToString().ToUpper()}";
+                    detailEquipBtnText.color = new Color(1f, 0.88f, 0.88f, 1f);
+                }
+                if (detailEquipBtnBg != null) detailEquipBtnBg.color = new Color(0.70f, 0.22f, 0.25f, 1f);
+
+                detailEquipBtn.onClick.AddListener(() =>
+                {
+                    int idx = activeStanceDeck.FindIndex(c => c != null && c.id == card.id);
+                    if (idx >= 0 && cm != null)
+                    {
+                        cm.RemoveCardFromStanceDeck(idx, currentStanceTab);
+                        RefreshDeck();
+                    }
+                });
+            }
+            else if (isTreeLocked)
             {
                 detailEquipBtn.interactable = false;
-                if (detailEquipBtnText != null) detailEquipBtnText.text = "STRUGGLE ACTION (Drawn in Hold)";
-                if (detailEquipBtnBg != null) detailEquipBtnBg.color = new Color(0.50f, 0.32f, 0.18f, 0.85f);
+                if (detailEquipBtnText != null)
+                {
+                    detailEquipBtnText.text = "LOCKED IN DESIRE TREE";
+                    detailEquipBtnText.color = new Color(0.70f, 0.70f, 0.75f, 1f);
+                }
+                if (detailEquipBtnBg != null) detailEquipBtnBg.color = new Color(0.35f, 0.30f, 0.40f, 0.6f);
+            }
+            else if (card.GetStanceCategory() != currentStanceTab)
+            {
+                detailEquipBtn.interactable = false;
+                if (detailEquipBtnText != null)
+                {
+                    detailEquipBtnText.text = $"REQUIRES {card.GetStanceCategory().ToString().ToUpper()} TAB";
+                    detailEquipBtnText.color = new Color(0.75f, 0.75f, 0.75f, 1f);
+                }
+                if (detailEquipBtnBg != null) detailEquipBtnBg.color = new Color(0.30f, 0.30f, 0.30f, 0.6f);
+            }
+            else if (activeStanceDeck.Count >= maxSlots)
+            {
+                detailEquipBtn.interactable = false;
+                if (detailEquipBtnText != null)
+                {
+                    detailEquipBtnText.text = $"STANCE FULL ({maxSlots}/{maxSlots})";
+                    detailEquipBtnText.color = new Color(0.70f, 0.70f, 0.70f, 1f);
+                }
+                if (detailEquipBtnBg != null) detailEquipBtnBg.color = new Color(0.35f, 0.33f, 0.32f, 0.5f);
             }
             else
             {
-                bool isAlreadyInDeck = false;
-                if (CombatManager.Instance != null && CombatManager.Instance.baseWarriorDeck != null)
+                detailEquipBtn.interactable = true;
+                if (detailEquipBtnText != null)
                 {
-                    for (int i = 0; i < CombatManager.Instance.baseWarriorDeck.Count; i++)
-                    {
-                        if (CombatManager.Instance.baseWarriorDeck[i]?.id == card.id)
-                        {
-                            isAlreadyInDeck = true;
-                            break;
-                        }
-                    }
+                    detailEquipBtnText.text = $"EQUIP TO {currentStanceTab.ToString().ToUpper()}";
+                    detailEquipBtnText.color = new Color(0.92f, 1.0f, 0.92f, 1f);
                 }
+                if (detailEquipBtnBg != null) detailEquipBtnBg.color = new Color(0.25f, 0.60f, 0.35f, 1f);
 
-                bool isDeckFull = (CombatManager.Instance != null && CombatManager.Instance.baseWarriorDeck.Count >= CombatManager.MAX_DECK_SIZE);
-
-                if (woodButtonSprite == null) woodButtonSprite = LoadUISprite("ui_button.png");
-                if (detailEquipBtnBg != null && woodButtonSprite != null && detailEquipBtnBg.sprite != woodButtonSprite)
+                detailEquipBtn.onClick.AddListener(() =>
                 {
-                    detailEquipBtnBg.sprite = woodButtonSprite;
-                    detailEquipBtnBg.type = Image.Type.Sliced;
-                }
-
-                if (isAlreadyInDeck)
-                {
-                    detailEquipBtn.interactable = false;
-                    if (detailEquipBtnText != null)
+                    if (cm != null)
                     {
-                        detailEquipBtnText.text = "EQUIPPED IN DECK";
-                        detailEquipBtnText.color = new Color(0.65f, 0.65f, 0.65f, 1f);
+                        cm.AddCardToStanceDeck(card, currentStanceTab);
+                        RefreshDeck();
                     }
-                    if (detailEquipBtnBg != null) detailEquipBtnBg.color = (woodButtonSprite != null) ? new Color(0.35f, 0.33f, 0.32f, 0.5f) : new Color(0.35f, 0.35f, 0.35f, 0.6f);
-                }
-                else if (isDeckFull)
-                {
-                    detailEquipBtn.interactable = false;
-                    if (detailEquipBtnText != null)
-                    {
-                        detailEquipBtnText.text = "DECK FULL (9/9)";
-                        detailEquipBtnText.color = new Color(0.65f, 0.65f, 0.65f, 1f);
-                    }
-                    if (detailEquipBtnBg != null) detailEquipBtnBg.color = (woodButtonSprite != null) ? new Color(0.35f, 0.33f, 0.32f, 0.5f) : new Color(0.35f, 0.35f, 0.35f, 0.6f);
-                }
-                else
-                {
-                    detailEquipBtn.interactable = true;
-                    if (detailEquipBtnText != null)
-                    {
-                        detailEquipBtnText.text = "ADD TO DECK";
-                        detailEquipBtnText.color = new Color(0.92f, 1.0f, 0.92f, 1f);
-                    }
-                    if (detailEquipBtnBg != null) detailEquipBtnBg.color = (woodButtonSprite != null) ? new Color(0.78f, 0.95f, 0.80f, 1f) : new Color(0.22f, 0.55f, 0.35f, 1f);
-                }
+                });
             }
         }
     }
@@ -2547,8 +2567,8 @@ public class LobbyUI : MonoBehaviour
         GameObject apTxtObj = new GameObject("Text", typeof(RectTransform));
         apTxtObj.transform.SetParent(apInner.transform, false);
         TextMeshProUGUI apTxt = apTxtObj.AddComponent<TextMeshProUGUI>();
-        apTxt.text = $"{card.apCost}";
-        apTxt.fontSize = 14;
+        apTxt.text = card.cooldownTurns > 0 ? $"{card.cooldownTurns}t" : "0";
+        apTxt.fontSize = 12;
         apTxt.fontStyle = FontStyles.Bold;
         apTxt.alignment = TextAlignmentOptions.Center;
         apTxt.color = Color.black;
@@ -2571,7 +2591,7 @@ public class LobbyUI : MonoBehaviour
             {
                 if (CombatManager.Instance != null)
                 {
-                    CombatManager.Instance.RemoveCardFromDeck(deckIndex);
+                    CombatManager.Instance.RemoveCardFromStanceDeck(deckIndex, currentStanceTab);
                     RefreshDeck();
                 }
             });
@@ -4057,17 +4077,14 @@ public class LobbyUI : MonoBehaviour
             assign(bBtn, bBg, txt);
         };
 
-        makeFilterBtn("ALL", 52f, DeckCategoryFilter.All, (b, bg, t) => {
-            lobby.filterAllBtn = b; lobby.filterAllBg = bg; lobby.filterAllText = t;
-        });
-        makeFilterBtn("TACTICS", 80f, DeckCategoryFilter.WarriorTactics, (b, bg, t) => {
+        makeFilterBtn("1. NEUTRAL", 96f, DeckCategoryFilter.WarriorTactics, (b, bg, t) => {
             lobby.filterTacticsBtn = b; lobby.filterTacticsBg = bg; lobby.filterTacticsText = t;
         });
-        makeFilterBtn("DESIRES", 80f, DeckCategoryFilter.LustInstincts, (b, bg, t) => {
-            lobby.filterLustBtn = b; lobby.filterLustBg = bg; lobby.filterLustText = t;
-        });
-        makeFilterBtn("STRUGGLE", 88f, DeckCategoryFilter.StruggleActions, (b, bg, t) => {
+        makeFilterBtn("2. GRAPPLE", 96f, DeckCategoryFilter.StruggleActions, (b, bg, t) => {
             lobby.filterStruggleBtn = b; lobby.filterStruggleBg = bg; lobby.filterStruggleText = t;
+        });
+        makeFilterBtn("3. SEX", 80f, DeckCategoryFilter.LustInstincts, (b, bg, t) => {
+            lobby.filterLustBtn = b; lobby.filterLustBg = bg; lobby.filterLustText = t;
         });
 
         GameObject colScrollObj = new GameObject("CollectionScrollView", typeof(RectTransform));
@@ -4273,7 +4290,7 @@ public class LobbyUI : MonoBehaviour
         GameObject actHead = new GameObject("ActiveHeader", typeof(RectTransform));
         actHead.transform.SetParent(bottomSecObj.transform, false);
         TextMeshProUGUI aht = actHead.AddComponent<TextMeshProUGUI>();
-        aht.text = "ACTIVE DECK (Equipped for Combat) • Hover over a card to reveal [X] to unequip";
+        aht.text = "ACTIVE STANCE SLOTS • Hover over an equipped card and click [X] to unequip";
         aht.fontSize = 15;
         aht.fontStyle = FontStyles.Bold;
         aht.color = new Color(0.95f, 0.80f, 0.35f, 1f);

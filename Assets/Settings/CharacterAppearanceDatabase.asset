@@ -12,22 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ed931f0f27f346118d7094ed4330f310, type: 3}
   m_Name: CharacterAppearanceDatabase
   m_EditorClassIdentifier: 
-  hairFrontStyles:
-  - {fileID: 21300000, guid: 13e2b03ddc948764dbb8728398fbcf94, type: 3}
-  - {fileID: 21300000, guid: bcb7019ae4efa4848ad5aa8da5d75982, type: 3}
-  - {fileID: 21300000, guid: fa6b769a7da82954496d69695ec1f28c, type: 3}
-  - {fileID: 21300000, guid: 6908f832bc2cede4f8134ff97757c1e2, type: 3}
-  - {fileID: 21300000, guid: 8a835be3d9fc89542b3289ceb1dcdd67, type: 3}
-  - {fileID: 21300000, guid: 97e5358b73c12884e9c08bd3d40b457b, type: 3}
-  - {fileID: 21300000, guid: ddafa5c25d423de4fae50072d6e8c61b, type: 3}
-  - {fileID: 21300000, guid: 781c1a5f647aa0e4e9c9c8863a1e2d92, type: 3}
-  hairBackStyles:
-  - {fileID: 21300000, guid: 1d1df0c0bc460744a8fc013635415c18, type: 3}
-  - {fileID: 21300000, guid: ba640069ba6ab6e40b45c93dbf5fa858, type: 3}
-  - {fileID: 21300000, guid: 3c97dec36dadb6f4c8ad746f2aab9f23, type: 3}
-  - {fileID: 21300000, guid: 3c0206cd81df5a44f8a1bda487e8f80e, type: 3}
-  - {fileID: 21300000, guid: 9afd0c0798be4d340b3a9ee100f0ba51, type: 3}
-  - {fileID: 21300000, guid: 825c280a79101274485c0c5f4c7fae08, type: 3}
+  hairFrontStyles: []
+  hairBackStyles: []
   emotionStyles:
   - {fileID: 21300000, guid: 6b20d9236e3644c29f64e4ffdefedf41, type: 3}
   - {fileID: 21300000, guid: 9eab977065844b76a94c1ed9ec32a553, type: 3}

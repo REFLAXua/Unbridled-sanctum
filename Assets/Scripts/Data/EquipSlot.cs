@@ -10,6 +10,7 @@ public enum EquipSlot
     UnderUpper = 3,   // Bra / Top Underwear
     UnderLower = 4,   // Panties / Bottom Underwear
     Accessory = 5,
+    Weapon = 6,
 
     [System.Obsolete("Use UnderUpper or UnderLower")]
     Underwear = 4,

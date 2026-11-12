@@ -12,6 +12,13 @@ namespace UnbridledSanctum.Combat
         ThroatLock      // Oral domination/throat lock hold
     }
 
+    public enum CardStanceCategory
+    {
+        Neutral = 0,
+        Grapple = 1,
+        Sex = 2
+    }
+
     public enum PenetrationSlot
     {
         None = 0,
@@ -96,6 +103,17 @@ namespace UnbridledSanctum.Combat
         public PenetrationSlot requiredTargetSlot = PenetrationSlot.None;
         public ExternalFinishZone controlZone = ExternalFinishZone.None;
         public bool isFinisherExecution = false;
+        public CardStanceCategory stanceCategory = CardStanceCategory.Neutral;
+
+        public CardStanceCategory GetStanceCategory()
+        {
+            if (stanceCategory != CardStanceCategory.Neutral) return stanceCategory;
+            if (category == CardCategory.LustInstinct || stanceRequirement == StanceRequirement.PenetratedOnly)
+                return CardStanceCategory.Sex;
+            if (category == CardCategory.StruggleAction || stanceRequirement == StanceRequirement.StruggleOnly)
+                return CardStanceCategory.Grapple;
+            return CardStanceCategory.Neutral;
+        }
 
         public CardData(string id, string name, int ap, int cd, int dmg, int shield, int seduction, CardTarget target, string desc)
         {
@@ -192,6 +210,7 @@ namespace UnbridledSanctum.Combat
                 this.isEphemeral, this.requiredTargetSlot, this.controlZone, this.isFinisherExecution);
             clone.clothesRepair = this.clothesRepair;
             clone.cardArt = this.cardArt;
+            clone.stanceCategory = this.stanceCategory;
             return clone;
         }
     }
@@ -208,14 +227,14 @@ namespace UnbridledSanctum.Combat
             this.currentCooldown = 0;
         }
 
-        public bool CanPlay(int currentAp)
+        public bool CanPlay(int currentAp = 1)
         {
-            return currentCooldown <= 0 && currentAp >= data.apCost;
+            return currentCooldown <= 0;
         }
 
         public bool CanPlay(int currentAp, CombatStance stance)
         {
-            if (currentCooldown > 0 || currentAp < data.apCost) return false;
+            if (currentCooldown > 0) return false;
 
             switch (data.stanceRequirement)
             {
@@ -390,6 +409,7 @@ namespace UnbridledSanctum.Combat
         public ItemData underLowerItem;
         public ItemData underwearItem; // Backward compatibility alias
         public ItemData accessoryItem;
+        public ItemData weaponItem;
 
         public bool isWearingCombinedClothes => upperItem != null && upperItem == lowerItem && (upperItem.IsCombinedArmor || upperItem.equipSlot == EquipSlot.CombinedClothes);
 
@@ -457,6 +477,11 @@ namespace UnbridledSanctum.Combat
             if (accessoryItem != null && accessoryItem != upperItem && accessoryItem != lowerItem && accessoryItem != underwearItem)
             {
                 total += selector(accessoryItem);
+            }
+
+            if (weaponItem != null && weaponItem != upperItem && weaponItem != lowerItem)
+            {
+                total += selector(weaponItem);
             }
 
             return total;

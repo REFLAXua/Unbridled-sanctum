@@ -41,6 +41,10 @@ public class ItemData : ScriptableObject
     [Tooltip("Unique keys or IDs for future passive effects or statuses granted while intact.")]
     public System.Collections.Generic.List<string> passiveEffectIds = new System.Collections.Generic.List<string>();
 
+    [Header("Innate Skill Grant")]
+    [Tooltip("Unique card ID granted to the player's Neutral stance when this item (weapon or accessory) is equipped.")]
+    public string grantedCardId = "";
+
     public bool IsCombinedArmor => equipSlot == EquipSlot.CombinedClothes;
     public bool IsUpperArmor => equipSlot == EquipSlot.UpperClothes || equipSlot == EquipSlot.CombinedClothes;
     public bool IsLowerArmor => equipSlot == EquipSlot.LowerClothes || equipSlot == EquipSlot.CombinedClothes;

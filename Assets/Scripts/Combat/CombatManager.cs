@@ -92,7 +92,24 @@ namespace UnbridledSanctum.Combat
         public CombatStance currentStance { get; private set; } = CombatStance.Neutral;
         public LustPathType activeLustPath { get; private set; } = LustPathType.PhallusDevotee;
         public List<CardInstance> equippedDeck { get; private set; } = new List<CardInstance>();
-        public List<CardData> baseWarriorDeck { get; private set; } = new List<CardData>();
+
+        [Header("3-Stance Sub-Decks")]
+        public int maxNeutralCards = 3; // 3 selectable + 1 innate weapon skill
+        public int maxGrappleCards = 3;
+        public int maxSexCards = 2; // naive Vessel starts with 2, expandable up to 5
+        public const int HARD_MAX_STANCE_CARDS = 5;
+
+        public List<CardData> equippedNeutralDeck { get; private set; } = new List<CardData>();
+        public List<CardData> equippedGrappleDeck { get; private set; } = new List<CardData>();
+        public List<CardData> equippedSexDeck { get; private set; } = new List<CardData>();
+
+        /// <summary>
+        /// Grace window: remaining turns where enemies are strictly forbidden from initiating grapples or penetration.
+        /// </summary>
+        public int playerGrappleImmunityTurns { get; set; } = 0;
+
+        // Backwards compatibility alias
+        public List<CardData> baseWarriorDeck => equippedNeutralDeck;
         public int persistentSemenVolumeMl = 0;
         public int persistentSemenMouthMl = 0;
         public const int MAX_SEMEN_MOUTH_ML = 100;
@@ -168,7 +185,7 @@ namespace UnbridledSanctum.Combat
         public event Action<float, float> OnCameraShakeRequested; // (intensity, duration)
 
         // Extensibility hooks for future mini-CG systems
-        public Func<Combatant, EnemySkill, PenetrationSlot, IEnumerator> CustomSexualMovementCGHandler;
+        public Func<Combatant, EnemySkill, PenetrationSlot, Action, IEnumerator> CustomSexualMovementCGHandler;
         public Func<Combatant, PenetrationSlot, int, IEnumerator> CustomEjaculationCGHandler;
 
         private void Awake()
@@ -238,119 +255,184 @@ namespace UnbridledSanctum.Combat
             }
             else
             {
-                // Fallback default cards - Warrior Tactics
-                unlockedCards.Add(new CardData("strike", "Strike", ap: 1, cd: 1, dmg: 7, shield: 0, seduction: 0, CardTarget.SingleEnemy, "Swift sword strike dealing 7 HP damage and 8 Stamina posture damage.", CardCategory.WarriorTactics, LustPathType.None, StanceRequirement.NeutralOnly, staminaDmg: 8));
-                unlockedCards.Add(new CardData("heavy_slash", "Heavy Slash", ap: 2, cd: 2, dmg: 16, shield: 0, seduction: 0, CardTarget.SingleEnemy, "Crushing overhead sword strike dealing 16 HP damage and 16 Stamina posture damage.", CardCategory.WarriorTactics, LustPathType.None, StanceRequirement.NeutralOnly, staminaDmg: 16));
-                unlockedCards.Add(new CardData("block", "Defend", ap: 1, cd: 1, dmg: 0, shield: 7, seduction: 0, CardTarget.Self, "Raise guard with shield, gaining 7 Shield. (Does not absorb Lust).", CardCategory.WarriorTactics, LustPathType.None, StanceRequirement.Any));
-                unlockedCards.Add(new CardData("shield_bash", "Shield Bash", ap: 1, cd: 2, dmg: 5, shield: 4, seduction: 0, CardTarget.SingleEnemy, "Slam opponent with shield rim: deals 5 damage, 12 Stamina posture damage, and gives 4 Shield.", CardCategory.WarriorTactics, LustPathType.None, StanceRequirement.NeutralOnly, staminaDmg: 12));
-                unlockedCards.Add(new CardData("iron_fortress", "Iron Fortress", ap: 2, cd: 2, dmg: 0, shield: 15, seduction: 0, CardTarget.Self, "Assume an unyielding defensive stance, gaining 15 Shield.", CardCategory.WarriorTactics, LustPathType.None, StanceRequirement.Any));
-                unlockedCards.Add(new CardData("mend_clothes", "Quick Patch", ap: 1, cd: 2, dmg: 0, shield: 0, seduction: 0, CardTarget.Self, "Swiftly adjust and bind garments, restoring 15 clothes durability.", CardCategory.WarriorTactics, LustPathType.None, StanceRequirement.Any));
-                unlockedCards.Add(new CardData("cold_focus", "Cold Focus", ap: 1, cd: 2, dmg: 0, shield: 6, seduction: 0, CardTarget.Self, "Focus mind with iron discipline, reducing internal Arousal by 25% and gaining 6 Shield.", CardCategory.WarriorTactics, LustPathType.None, StanceRequirement.Any, arousalSelf: -25));
-                unlockedCards.Add(new CardData("disengage_kick", "Disengage Kick", ap: 1, cd: 1, dmg: 5, shield: 0, seduction: 0, CardTarget.SingleEnemy, "Deliver a swift push kick to drive back advancing foes. Deals 5 HP damage, 15 Stamina posture damage, and breaks physical holds.", CardCategory.WarriorTactics, LustPathType.None, StanceRequirement.Any, staminaDmg: 15));
+                // Base Physical Actions - Neutral Stance
+                unlockedCards.Add(new CardData("punch", "Punch", ap: 0, cd: 0, dmg: 5, shield: 0, seduction: 0, CardTarget.SingleEnemy, "Swift straight punch dealing 5 HP damage and 10 Stamina posture damage.", CardCategory.WarriorTactics, LustPathType.None, StanceRequirement.NeutralOnly, staminaDmg: 10) { stanceCategory = CardStanceCategory.Neutral });
+                unlockedCards.Add(new CardData("guard", "Guard", ap: 0, cd: 0, dmg: 0, shield: 6, seduction: 0, CardTarget.Self, "Raise forearms to brace against incoming attacks, gaining 6 Shield.", CardCategory.WarriorTactics, LustPathType.None, StanceRequirement.Any) { stanceCategory = CardStanceCategory.Neutral });
+                unlockedCards.Add(new CardData("wait", "Wait & Observe", ap: 0, cd: 0, dmg: 0, shield: 6, seduction: 0, CardTarget.Self, "Spend the turn calmly watching opponent moves. Restores 12 Stamina and gains 6 Shield.", CardCategory.WarriorTactics, LustPathType.None, StanceRequirement.Any) { stanceCategory = CardStanceCategory.Neutral });
+                unlockedCards.Add(new CardData("push_kick", "Push Kick", ap: 0, cd: 1, dmg: 4, shield: 0, seduction: 0, CardTarget.SingleEnemy, "A forceful kick that deals 4 HP damage and 16 Stamina posture damage.", CardCategory.WarriorTactics, LustPathType.None, StanceRequirement.NeutralOnly, staminaDmg: 16) { stanceCategory = CardStanceCategory.Neutral });
+                unlockedCards.Add(new CardData("palm_strike", "Palm Thrust", ap: 0, cd: 0, dmg: 4, shield: 0, seduction: 0, CardTarget.SingleEnemy, "A disciplined non-lethal palm strike to the opponent's torso, dealing 4 subduing HP damage and 8 Stamina posture damage.", CardCategory.WarriorTactics, LustPathType.None, StanceRequirement.NeutralOnly, staminaDmg: 8) { stanceCategory = CardStanceCategory.Neutral });
+                unlockedCards.Add(new CardData("unarmed_scratch", "Desperate Scratch", ap: 0, cd: 0, dmg: 3, shield: 0, seduction: 0, CardTarget.SingleEnemy, "Lash out with nails dealing 3 HP damage and 4 Stamina posture damage.", CardCategory.WarriorTactics, LustPathType.None, StanceRequirement.NeutralOnly, staminaDmg: 4) { stanceCategory = CardStanceCategory.Neutral });
 
-                // Path 1: Phallus Devotee (Lust Instincts - 9 Cards)
-                unlockedCards.Add(new CardData("breath_of_ecstasy", "Breath of Ecstasy", ap: 0, cd: 1, dmg: 0, shield: 0, seduction: 0, CardTarget.Self, "Exhale softly to cool burning blood, reducing self Arousal by 15% and steadying your mind.", CardCategory.LustInstinct, LustPathType.PhallusDevotee, StanceRequirement.Any, arousalSelf: -15, ephemeral: true));
-                unlockedCards.Add(new CardData("enticing_glance", "Enticing Glance", ap: 1, cd: 1, dmg: 0, shield: 0, seduction: 20, CardTarget.SingleEnemy, "Cast a sultry, inviting glance that unsettles the foe's resolve (+20% Arousal).", CardCategory.LustInstinct, LustPathType.PhallusDevotee, StanceRequirement.NeutralOnly, arousalTarget: 20, ephemeral: true));
-                unlockedCards.Add(new CardData("throat_lock", "Throat Lock", ap: 1, cd: 1, dmg: 0, shield: 0, seduction: 25, CardTarget.SingleEnemy, "Wrap lips and throat firmly around the opponent's shaft to seize control (+25% Arousal, 10 Stamina damage).", CardCategory.LustInstinct, LustPathType.PhallusDevotee, StanceRequirement.PenetratedOnly, staminaDmg: 10, arousalTarget: 25, ephemeral: true, reqSlot: PenetrationSlot.Mouth));
-                unlockedCards.Add(new CardData("deep_swallow", "Deep Swallow", ap: 2, cd: 2, dmg: 0, shield: 0, seduction: 40, CardTarget.SingleEnemy, "Take full length deep into your throat: provokes ejaculation (+40% Arousal, absorbs 50ml Cum, heals 8 HP).", CardCategory.LustInstinct, LustPathType.PhallusDevotee, StanceRequirement.PenetratedOnly, arousalTarget: 40, semenMl: 50, ephemeral: true, reqSlot: PenetrationSlot.Mouth));
-                unlockedCards.Add(new CardData("vaginal_clench", "Vaginal Clench", ap: 1, cd: 1, dmg: 0, shield: 0, seduction: 30, CardTarget.SingleEnemy, "Contract inner walls rhythmically around the shaft, dealing 12 Stamina damage, +30% Arousal, and absorbing 30ml Cum.", CardCategory.LustInstinct, LustPathType.PhallusDevotee, StanceRequirement.PenetratedOnly, staminaDmg: 12, arousalTarget: 30, semenMl: 30, ephemeral: true, reqSlot: PenetrationSlot.Vagina));
-                unlockedCards.Add(new CardData("womb_suction", "Womb Suction", ap: 2, cd: 2, dmg: 0, shield: 0, seduction: 45, CardTarget.SingleEnemy, "Engage deep uterine peristalsis around the invading head: strips 20 Stamina, deals +45% Arousal, and extracts 60ml Cum.", CardCategory.LustInstinct, LustPathType.PhallusDevotee, StanceRequirement.PenetratedOnly, staminaDmg: 20, arousalTarget: 45, semenMl: 60, ephemeral: true, reqSlot: PenetrationSlot.Vagina));
-                unlockedCards.Add(new CardData("lust_barrier", "Lust Barrier", ap: 1, cd: 1, dmg: 0, shield: 0, seduction: 15, CardTarget.Self, "Channel absorbed Cum through the Womb Tattoo, converting up to 25ml Cum into Lust Shield.", CardCategory.LustInstinct, LustPathType.PhallusDevotee, StanceRequirement.Any, arousalTarget: 15, lustShield: 0, ephemeral: true));
-                unlockedCards.Add(new CardData("cum_surge", "Cum Surge", ap: 1, cd: 2, dmg: 0, shield: 10, seduction: 0, CardTarget.Self, "Transmute stored Cum into an explosive surge of condensed bio-barrier (+10 Shield, converts up to 40ml Cum into Lust Shield).", CardCategory.LustInstinct, LustPathType.PhallusDevotee, StanceRequirement.Any, lustShield: 0, ephemeral: true));
-                unlockedCards.Add(new CardData("overwhelming_surrender", "Overwhelming Surrender", ap: 2, cd: 3, dmg: 0, shield: 0, seduction: 50, CardTarget.SingleEnemy, "Surrender fully to the ecstasy of the embedded shaft: inflicts +50% Arousal, and if holding over 80ml Cum, restores 15 HP.", CardCategory.LustInstinct, LustPathType.PhallusDevotee, StanceRequirement.Any, arousalTarget: 50, ephemeral: true));
+                // Innate Weapon Granted Actions (Non-Lethal Incapacitation & Subduing)
+                unlockedCards.Add(new CardData("baton_concussion", "Concussive Strike", ap: 0, cd: 1, dmg: 5, shield: 0, seduction: 0, CardTarget.SingleEnemy, "A heavy, calculated blow with the shock baton to shatter balance. Deals 5 subduing HP damage and 16 Stamina posture damage.", CardCategory.WarriorTactics, LustPathType.None, StanceRequirement.NeutralOnly, staminaDmg: 16) { stanceCategory = CardStanceCategory.Neutral });
+                unlockedCards.Add(new CardData("foil_parry", "Parry & Disarm", ap: 0, cd: 1, dmg: 6, shield: 6, seduction: 0, CardTarget.SingleEnemy, "Deflect incoming momentum and strike to disarm. Deals 6 subduing HP damage, 8 Stamina posture damage, and forms 6 Shield.", CardCategory.WarriorTactics, LustPathType.None, StanceRequirement.NeutralOnly, staminaDmg: 8) { stanceCategory = CardStanceCategory.Neutral });
+                unlockedCards.Add(new CardData("whip_snap", "Stinging Lash", ap: 0, cd: 1, dmg: 3, shield: 0, seduction: 25, CardTarget.SingleEnemy, "A stinging leather lash that cracks against bare flanks and nerves: deals 3 damage, 10 Stamina posture damage, and stirs 25% Arousal.", CardCategory.WarriorTactics, LustPathType.None, StanceRequirement.NeutralOnly, staminaDmg: 10, arousalTarget: 25) { stanceCategory = CardStanceCategory.Neutral });
+                unlockedCards.Add(new CardData("harmonic_soothe", "Harmonic Pacification", ap: 0, cd: 1, dmg: 0, shield: 0, seduction: 35, CardTarget.SingleEnemy, "Project resonant soothing crystal frequencies that disarm aggression: raises enemy Arousal by 35%, reduces your Arousal by 15%, and forms 6 Lust Shield.", CardCategory.WarriorTactics, LustPathType.None, StanceRequirement.NeutralOnly, staminaDmg: 6, arousalTarget: 35, arousalSelf: -15, lustShield: 6) { stanceCategory = CardStanceCategory.Neutral });
+                unlockedCards.Add(new CardData("sword_slash", "Sword Slash", ap: 0, cd: 0, dmg: 8, shield: 0, seduction: 0, CardTarget.SingleEnemy, "A clean blade cut dealing 8 HP damage and 8 Stamina posture damage.", CardCategory.WarriorTactics, LustPathType.None, StanceRequirement.NeutralOnly, staminaDmg: 8) { stanceCategory = CardStanceCategory.Neutral });
+
+                // Classic Warrior Tactics - Neutral Stance (Unlockable)
+                unlockedCards.Add(new CardData("strike", "Strike", ap: 0, cd: 0, dmg: 7, shield: 0, seduction: 0, CardTarget.SingleEnemy, "Swift sword strike dealing 7 HP damage and 8 Stamina posture damage.", CardCategory.WarriorTactics, LustPathType.None, StanceRequirement.NeutralOnly, staminaDmg: 8) { stanceCategory = CardStanceCategory.Neutral });
+                unlockedCards.Add(new CardData("heavy_slash", "Heavy Slash", ap: 0, cd: 2, dmg: 16, shield: 0, seduction: 0, CardTarget.SingleEnemy, "Crushing overhead sword strike dealing 16 HP damage and 16 Stamina posture damage.", CardCategory.WarriorTactics, LustPathType.None, StanceRequirement.NeutralOnly, staminaDmg: 16) { stanceCategory = CardStanceCategory.Neutral });
+                unlockedCards.Add(new CardData("block", "Defend", ap: 0, cd: 1, dmg: 0, shield: 8, seduction: 0, CardTarget.Self, "Raise guard with shield, gaining 8 Shield.", CardCategory.WarriorTactics, LustPathType.None, StanceRequirement.Any) { stanceCategory = CardStanceCategory.Neutral });
+                unlockedCards.Add(new CardData("shield_bash", "Shield Bash", ap: 0, cd: 2, dmg: 5, shield: 4, seduction: 0, CardTarget.SingleEnemy, "Slam opponent with shield rim: deals 5 damage, 12 Stamina posture damage, and gives 4 Shield.", CardCategory.WarriorTactics, LustPathType.None, StanceRequirement.NeutralOnly, staminaDmg: 12) { stanceCategory = CardStanceCategory.Neutral });
+                unlockedCards.Add(new CardData("iron_fortress", "Iron Fortress", ap: 0, cd: 2, dmg: 0, shield: 15, seduction: 0, CardTarget.Self, "Assume an unyielding defensive stance, gaining 15 Shield.", CardCategory.WarriorTactics, LustPathType.None, StanceRequirement.Any) { stanceCategory = CardStanceCategory.Neutral });
+                unlockedCards.Add(new CardData("mend_clothes", "Quick Patch", ap: 0, cd: 2, dmg: 0, shield: 0, seduction: 0, CardTarget.Self, "Swiftly adjust and bind garments, restoring 15 clothes durability.", CardCategory.WarriorTactics, LustPathType.None, StanceRequirement.Any) { stanceCategory = CardStanceCategory.Neutral });
+                unlockedCards.Add(new CardData("cold_focus", "Cold Focus", ap: 0, cd: 2, dmg: 0, shield: 6, seduction: 0, CardTarget.Self, "Focus mind with iron discipline, reducing internal Arousal by 25% and gaining 6 Shield.", CardCategory.WarriorTactics, LustPathType.None, StanceRequirement.Any, arousalSelf: -25) { stanceCategory = CardStanceCategory.Neutral });
+                unlockedCards.Add(new CardData("disengage_kick", "Disengage Kick", ap: 0, cd: 1, dmg: 5, shield: 0, seduction: 0, CardTarget.SingleEnemy, "Deliver a swift push kick to drive back advancing foes. Deals 5 HP damage, 15 Stamina posture damage, and breaks physical holds.", CardCategory.WarriorTactics, LustPathType.None, StanceRequirement.Any, staminaDmg: 15) { stanceCategory = CardStanceCategory.Neutral });
+
+                // Base Struggle Actions - Grapple Stance
+                unlockedCards.Add(new CardData("struggle", "Struggle", ap: 0, cd: 0, dmg: 3, shield: 0, seduction: 0, CardTarget.SingleEnemy, "Thrash and fight against the physical hold, dealing 12 Stamina posture damage to the grappling enemy.", CardCategory.StruggleAction, LustPathType.None, StanceRequirement.StruggleOnly, staminaDmg: 12) { stanceCategory = CardStanceCategory.Grapple });
+                unlockedCards.Add(new CardData("shift_weight", "Shift Weight", ap: 0, cd: 1, dmg: 0, shield: 8, seduction: 0, CardTarget.Self, "Maneuver your center of gravity to brace against the pin, gaining 8 Shield and draining 6 enemy Stamina.", CardCategory.StruggleAction, LustPathType.None, StanceRequirement.StruggleOnly, lustShield: 4, staminaDmg: 6) { stanceCategory = CardStanceCategory.Grapple });
+                unlockedCards.Add(new CardData("whimper", "Flushed Whimper", ap: 0, cd: 1, dmg: 0, shield: 0, seduction: 15, CardTarget.SingleEnemy, "Let out a breathless, vulnerable whimper that rouses 15% enemy Arousal, dampening their aggression.", CardCategory.StruggleAction, LustPathType.None, StanceRequirement.StruggleOnly, arousalTarget: 15) { stanceCategory = CardStanceCategory.Grapple });
+                unlockedCards.Add(new CardData("break_free", "Break Free", ap: 0, cd: 1, dmg: 4, shield: 0, seduction: 0, CardTarget.SingleEnemy, "Struggle vigorously with limbs to dislodge the grapple (deals 16 Stamina damage; escapes to Neutral if enemy stamina depletes).", CardCategory.StruggleAction, LustPathType.None, StanceRequirement.StruggleOnly, staminaDmg: 16) { stanceCategory = CardStanceCategory.Grapple });
+                unlockedCards.Add(new CardData("struggle_clinch", "Clinch & Hold", ap: 0, cd: 1, dmg: 0, shield: 6, seduction: 15, CardTarget.SingleEnemy, "Clinch close to leverage body weight against the foe: grants 6 Shield, deals 6 Stamina damage, and stirs 15% Arousal.", CardCategory.StruggleAction, LustPathType.None, StanceRequirement.StruggleOnly, staminaDmg: 6, arousalTarget: 15) { stanceCategory = CardStanceCategory.Grapple });
+                unlockedCards.Add(new CardData("sensual_caress", "Sensual Caress", ap: 0, cd: 1, dmg: 0, shield: 0, seduction: 35, CardTarget.SingleEnemy, "Caress sensitive flanks and thighs, driving the opponent into ecstatic frenzy (+35% enemy Arousal, +10% self Arousal).", CardCategory.StruggleAction, LustPathType.None, StanceRequirement.StruggleOnly, arousalSelf: 10, arousalTarget: 35) { stanceCategory = CardStanceCategory.Grapple });
+                unlockedCards.Add(new CardData("shift_leverage", "Shift Leverage", ap: 0, cd: 1, dmg: 0, shield: 8, seduction: 0, CardTarget.Self, "Maneuver your hips and torso to deflect crushing weight, gaining 8 Shield and 8 Lust Shield.", CardCategory.StruggleAction, LustPathType.None, StanceRequirement.StruggleOnly, lustShield: 8) { stanceCategory = CardStanceCategory.Grapple });
+
+                // Base Intimate Actions - Sex Stance (Penetration & ThroatLock)
+                unlockedCards.Add(new CardData("endure_breath", "Endure Breath", ap: 0, cd: 0, dmg: 0, shield: 0, seduction: 0, CardTarget.Self, "Close your eyes, steel your spirit and control your breath: cools Arousal by 15% and forms 6 Lust Shield.", CardCategory.LustInstinct, LustPathType.None, StanceRequirement.PenetratedOnly, arousalSelf: -15, lustShield: 6) { stanceCategory = CardStanceCategory.Sex });
+                unlockedCards.Add(new CardData("helpless_squirm", "Helpless Squirm", ap: 0, cd: 1, dmg: 0, shield: 5, seduction: 10, CardTarget.SingleEnemy, "Tremble and squirm against the invasive pressure (+10% enemy Arousal, +5 Shield).", CardCategory.LustInstinct, LustPathType.None, StanceRequirement.PenetratedOnly, arousalTarget: 10, lustShield: 5) { stanceCategory = CardStanceCategory.Sex });
+                unlockedCards.Add(new CardData("counter_clench", "Counter Clench", ap: 0, cd: 1, dmg: 0, shield: 0, seduction: 45, CardTarget.SingleEnemy, "Counter-clamp the embedded shaft with fierce rhythmic spasms, stripping 15 Stamina and dealing 45% Arousal.", CardCategory.LustInstinct, LustPathType.None, StanceRequirement.PenetratedOnly, staminaDmg: 15, arousalTarget: 45, semenMl: 40) { stanceCategory = CardStanceCategory.Sex });
+
+                // Path 1: Phallus Devotee (Lust Instincts - 9 Cards - Sex Stance)
+                unlockedCards.Add(new CardData("breath_of_ecstasy", "Breath of Ecstasy", ap: 0, cd: 1, dmg: 0, shield: 0, seduction: 0, CardTarget.Self, "Exhale softly to cool burning blood, reducing self Arousal by 15% and steadying your mind.", CardCategory.LustInstinct, LustPathType.PhallusDevotee, StanceRequirement.Any, arousalSelf: -15, ephemeral: true) { stanceCategory = CardStanceCategory.Sex });
+                unlockedCards.Add(new CardData("enticing_glance", "Enticing Glance", ap: 0, cd: 1, dmg: 0, shield: 0, seduction: 20, CardTarget.SingleEnemy, "Cast a sultry, inviting glance that unsettles the foe's resolve (+20% Arousal).", CardCategory.LustInstinct, LustPathType.PhallusDevotee, StanceRequirement.NeutralOnly, arousalTarget: 20, ephemeral: true) { stanceCategory = CardStanceCategory.Neutral });
+                unlockedCards.Add(new CardData("throat_lock", "Throat Lock", ap: 0, cd: 1, dmg: 0, shield: 0, seduction: 25, CardTarget.SingleEnemy, "Wrap lips and throat firmly around the opponent's shaft to seize control (+25% Arousal, 10 Stamina damage).", CardCategory.LustInstinct, LustPathType.PhallusDevotee, StanceRequirement.PenetratedOnly, staminaDmg: 10, arousalTarget: 25, ephemeral: true, reqSlot: PenetrationSlot.Mouth) { stanceCategory = CardStanceCategory.Sex });
+                unlockedCards.Add(new CardData("deep_swallow", "Deep Swallow", ap: 0, cd: 2, dmg: 0, shield: 0, seduction: 40, CardTarget.SingleEnemy, "Take full length deep into your throat: provokes ejaculation (+40% Arousal, absorbs 50ml Cum, heals 8 HP).", CardCategory.LustInstinct, LustPathType.PhallusDevotee, StanceRequirement.PenetratedOnly, arousalTarget: 40, semenMl: 50, ephemeral: true, reqSlot: PenetrationSlot.Mouth) { stanceCategory = CardStanceCategory.Sex });
+                unlockedCards.Add(new CardData("vaginal_clench", "Vaginal Clench", ap: 0, cd: 1, dmg: 0, shield: 0, seduction: 30, CardTarget.SingleEnemy, "Contract inner walls rhythmically around the shaft, dealing 12 Stamina damage, +30% Arousal, and absorbing 30ml Cum.", CardCategory.LustInstinct, LustPathType.PhallusDevotee, StanceRequirement.PenetratedOnly, staminaDmg: 12, arousalTarget: 30, semenMl: 30, ephemeral: true, reqSlot: PenetrationSlot.Vagina) { stanceCategory = CardStanceCategory.Sex });
+                unlockedCards.Add(new CardData("womb_suction", "Womb Suction", ap: 0, cd: 2, dmg: 0, shield: 0, seduction: 45, CardTarget.SingleEnemy, "Engage deep uterine peristalsis around the invading head: strips 20 Stamina, deals +45% Arousal, and extracts 60ml Cum.", CardCategory.LustInstinct, LustPathType.PhallusDevotee, StanceRequirement.PenetratedOnly, staminaDmg: 20, arousalTarget: 45, semenMl: 60, ephemeral: true, reqSlot: PenetrationSlot.Vagina) { stanceCategory = CardStanceCategory.Sex });
+                unlockedCards.Add(new CardData("lust_barrier", "Lust Barrier", ap: 0, cd: 1, dmg: 0, shield: 0, seduction: 15, CardTarget.Self, "Channel absorbed Cum through the Womb Tattoo, converting up to 25ml Cum into Lust Shield.", CardCategory.LustInstinct, LustPathType.PhallusDevotee, StanceRequirement.Any, arousalTarget: 15, lustShield: 0, ephemeral: true) { stanceCategory = CardStanceCategory.Sex });
+                unlockedCards.Add(new CardData("cum_surge", "Cum Surge", ap: 0, cd: 2, dmg: 0, shield: 10, seduction: 0, CardTarget.Self, "Transmute stored Cum into an explosive surge of condensed bio-barrier (+10 Shield, converts up to 40ml Cum into Lust Shield).", CardCategory.LustInstinct, LustPathType.PhallusDevotee, StanceRequirement.Any, lustShield: 0, ephemeral: true) { stanceCategory = CardStanceCategory.Sex });
+                unlockedCards.Add(new CardData("overwhelming_surrender", "Overwhelming Surrender", ap: 0, cd: 3, dmg: 0, shield: 0, seduction: 50, CardTarget.SingleEnemy, "Surrender fully to the ecstasy of the embedded shaft: inflicts +50% Arousal, and if holding over 80ml Cum, restores 15 HP.", CardCategory.LustInstinct, LustPathType.PhallusDevotee, StanceRequirement.Any, arousalTarget: 50, ephemeral: true) { stanceCategory = CardStanceCategory.Sex });
 
                 // Path 2: Bound & Submissive (Lust Instincts - 9 Cards)
-                unlockedCards.Add(new CardData("yielding_curve", "Yielding Curve", ap: 0, cd: 1, dmg: 0, shield: 10, seduction: 0, CardTarget.Self, "Arch back into an alluring, compliant posture, gaining 10 Shield while internal Arousal increases by 10%.", CardCategory.LustInstinct, LustPathType.BoundSubmissive, StanceRequirement.Any, arousalSelf: 10, ephemeral: true));
-                unlockedCards.Add(new CardData("bound_kick", "Bound Kick", ap: 1, cd: 1, dmg: 6, shield: 0, seduction: 0, CardTarget.SingleEnemy, "Deliver a sharp, leveraged kick despite being held, dealing 6 HP damage and 16 Stamina posture damage.", CardCategory.LustInstinct, LustPathType.BoundSubmissive, StanceRequirement.StruggleOnly, staminaDmg: 16, ephemeral: true));
-                unlockedCards.Add(new CardData("sweet_captivity", "Sweet Captivity", ap: 1, cd: 2, dmg: 0, shield: 0, seduction: 0, CardTarget.Self, "Embrace the crushing weight of physical confinement, generating 12 Lust Shield and restoring 1 AP next turn.", CardCategory.LustInstinct, LustPathType.BoundSubmissive, StanceRequirement.StruggleOnly, lustShield: 12, ephemeral: true));
-                unlockedCards.Add(new CardData("spank_reception", "Spank Reception", ap: 1, cd: 1, dmg: 0, shield: 12, seduction: 25, CardTarget.SingleEnemy, "Turn stinging physical blows into thrilling heat: gain 12 Shield, inflame enemy (+25% Arousal), rising self Arousal (+10%).", CardCategory.LustInstinct, LustPathType.BoundSubmissive, StanceRequirement.Any, arousalSelf: 10, arousalTarget: 25, ephemeral: true));
-                unlockedCards.Add(new CardData("flushed_whimper", "Flushed Whimper", ap: 1, cd: 2, dmg: 0, shield: 0, seduction: 25, CardTarget.SingleEnemy, "Let out a breathless, flushed whimper that disarms the foe (+25% Arousal) and dampens their next attack.", CardCategory.LustInstinct, LustPathType.BoundSubmissive, StanceRequirement.Any, arousalTarget: 25, ephemeral: true));
-                unlockedCards.Add(new CardData("masochistic_ecstasy", "Masochistic Ecstasy", ap: 2, cd: 2, dmg: 0, shield: 0, seduction: 0, CardTarget.Self, "Convert the humiliation of confinement and torn cloth into pure spiritual resilience (+25 Lust Shield, heals 10 HP, -20% Arousal).", CardCategory.LustInstinct, LustPathType.BoundSubmissive, StanceRequirement.StruggleOnly, lustShield: 25, arousalSelf: -20, ephemeral: true));
-                unlockedCards.Add(new CardData("submissive_murmur", "Submissive Murmur", ap: 0, cd: 1, dmg: 0, shield: 0, seduction: 20, CardTarget.SingleEnemy, "Whisper submissive praise directly against the enemy's ear, draining 10 Stamina and adding 20% Arousal.", CardCategory.LustInstinct, LustPathType.BoundSubmissive, StanceRequirement.Any, staminaDmg: 10, arousalTarget: 20, ephemeral: true));
-                unlockedCards.Add(new CardData("wrist_lock_reverse", "Wrist Lock Reverse", ap: 1, cd: 2, dmg: 8, shield: 0, seduction: 0, CardTarget.SingleEnemy, "Use the opponent's own pinning grip to wrench their wrist: deals 8 HP dmg, 18 Stamina damage, and breaks their hold.", CardCategory.LustInstinct, LustPathType.BoundSubmissive, StanceRequirement.StruggleOnly, staminaDmg: 18, ephemeral: true));
-                unlockedCards.Add(new CardData("unbreakable_leash", "Unbreakable Leash", ap: 2, cd: 3, dmg: 0, shield: 0, seduction: 45, CardTarget.SingleEnemy, "Wrap limbs and bindings tightly around the foe in an erotic lock, stripping 15 Stamina and inflicting +45% Arousal.", CardCategory.LustInstinct, LustPathType.BoundSubmissive, StanceRequirement.StruggleOnly, staminaDmg: 15, arousalTarget: 45, ephemeral: true));
+                unlockedCards.Add(new CardData("yielding_curve", "Yielding Curve", ap: 0, cd: 1, dmg: 0, shield: 10, seduction: 0, CardTarget.Self, "Arch back into an alluring, compliant posture, gaining 10 Shield while internal Arousal increases by 10%.", CardCategory.LustInstinct, LustPathType.BoundSubmissive, StanceRequirement.Any, arousalSelf: 10, ephemeral: true) { stanceCategory = CardStanceCategory.Sex });
+                unlockedCards.Add(new CardData("bound_kick", "Bound Kick", ap: 0, cd: 1, dmg: 6, shield: 0, seduction: 0, CardTarget.SingleEnemy, "Deliver a sharp, leveraged kick despite being held, dealing 6 HP damage and 16 Stamina posture damage.", CardCategory.LustInstinct, LustPathType.BoundSubmissive, StanceRequirement.StruggleOnly, staminaDmg: 16, ephemeral: true) { stanceCategory = CardStanceCategory.Grapple });
+                unlockedCards.Add(new CardData("sweet_captivity", "Sweet Captivity", ap: 0, cd: 2, dmg: 0, shield: 0, seduction: 0, CardTarget.Self, "Embrace the crushing weight of physical confinement, generating 12 Lust Shield.", CardCategory.LustInstinct, LustPathType.BoundSubmissive, StanceRequirement.StruggleOnly, lustShield: 12, ephemeral: true) { stanceCategory = CardStanceCategory.Grapple });
+                unlockedCards.Add(new CardData("spank_reception", "Spank Reception", ap: 0, cd: 1, dmg: 0, shield: 12, seduction: 25, CardTarget.SingleEnemy, "Turn stinging physical blows into thrilling heat: gain 12 Shield, inflame enemy (+25% Arousal), rising self Arousal (+10%).", CardCategory.LustInstinct, LustPathType.BoundSubmissive, StanceRequirement.Any, arousalSelf: 10, arousalTarget: 25, ephemeral: true) { stanceCategory = CardStanceCategory.Sex });
+                unlockedCards.Add(new CardData("flushed_whimper", "Flushed Whimper", ap: 0, cd: 2, dmg: 0, shield: 0, seduction: 25, CardTarget.SingleEnemy, "Let out a breathless, flushed whimper that disarms the foe (+25% Arousal) and dampens their next attack.", CardCategory.LustInstinct, LustPathType.BoundSubmissive, StanceRequirement.Any, arousalTarget: 25, ephemeral: true) { stanceCategory = CardStanceCategory.Grapple });
+                unlockedCards.Add(new CardData("masochistic_ecstasy", "Masochistic Ecstasy", ap: 0, cd: 2, dmg: 0, shield: 0, seduction: 0, CardTarget.Self, "Convert the humiliation of confinement and torn cloth into pure spiritual resilience (+25 Lust Shield, heals 10 HP, -20% Arousal).", CardCategory.LustInstinct, LustPathType.BoundSubmissive, StanceRequirement.StruggleOnly, lustShield: 25, arousalSelf: -20, ephemeral: true) { stanceCategory = CardStanceCategory.Grapple });
+                unlockedCards.Add(new CardData("submissive_murmur", "Submissive Murmur", ap: 0, cd: 1, dmg: 0, shield: 0, seduction: 20, CardTarget.SingleEnemy, "Whisper submissive praise directly against the enemy's ear, draining 10 Stamina and adding 20% Arousal.", CardCategory.LustInstinct, LustPathType.BoundSubmissive, StanceRequirement.Any, staminaDmg: 10, arousalTarget: 20, ephemeral: true) { stanceCategory = CardStanceCategory.Grapple });
+                unlockedCards.Add(new CardData("wrist_lock_reverse", "Wrist Lock Reverse", ap: 0, cd: 2, dmg: 8, shield: 0, seduction: 0, CardTarget.SingleEnemy, "Use the opponent's own pinning grip to wrench their wrist: deals 8 HP dmg, 18 Stamina damage, and breaks their hold.", CardCategory.LustInstinct, LustPathType.BoundSubmissive, StanceRequirement.StruggleOnly, staminaDmg: 18, ephemeral: true) { stanceCategory = CardStanceCategory.Grapple });
+                unlockedCards.Add(new CardData("unbreakable_leash", "Unbreakable Leash", ap: 0, cd: 3, dmg: 0, shield: 0, seduction: 45, CardTarget.SingleEnemy, "Wrap limbs and bindings tightly around the foe in an erotic lock, stripping 15 Stamina and inflicting +45% Arousal.", CardCategory.LustInstinct, LustPathType.BoundSubmissive, StanceRequirement.StruggleOnly, staminaDmg: 15, arousalTarget: 45, ephemeral: true) { stanceCategory = CardStanceCategory.Grapple });
 
                 // Path 3: Monster Transformation (Lust Instincts - 9 Cards)
-                unlockedCards.Add(new CardData("pheromone_spray", "Pheromone Spray", ap: 1, cd: 1, dmg: 0, shield: 0, seduction: 20, CardTarget.SingleEnemy, "Exude sweet, intoxicating succubus pheromones from skin pores (+20% enemy Arousal, 8 Stamina damage).", CardCategory.LustInstinct, LustPathType.MonsterTransformation, StanceRequirement.Any, staminaDmg: 8, arousalTarget: 20, ephemeral: true));
-                unlockedCards.Add(new CardData("cushioning_bust", "Cushioning Bust", ap: 1, cd: 1, dmg: 0, shield: 12, seduction: 25, CardTarget.Self, "Press your swelling, sensitive bust against the opponent to cushion force (+12 Shield) while driving them mad (+25% Arousal).", CardCategory.LustInstinct, LustPathType.MonsterTransformation, StanceRequirement.Any, arousalTarget: 25, ephemeral: true));
-                unlockedCards.Add(new CardData("milky_relief", "Milky Relief", ap: 2, cd: 2, dmg: 0, shield: 0, seduction: 0, CardTarget.Self, "Release warm maternal secretions to soothe strained muscle and mind: heals 12 HP, restores 15 Stamina, cools Arousal by 25%.", CardCategory.LustInstinct, LustPathType.MonsterTransformation, StanceRequirement.Any, arousalSelf: -25, ephemeral: true));
-                unlockedCards.Add(new CardData("womb_pulse", "Womb Pulse", ap: 1, cd: 1, dmg: 0, shield: 0, seduction: 30, CardTarget.SingleEnemy, "The demonic Womb Tattoo flares beneath the skin: unleashes an ecstatic shockwave (+30% Arousal) and forms +12 Lust Shield.", CardCategory.LustInstinct, LustPathType.MonsterTransformation, StanceRequirement.Any, arousalTarget: 30, lustShield: 12, ephemeral: true));
-                unlockedCards.Add(new CardData("succubus_siphon", "Succubus Siphon", ap: 1, cd: 2, dmg: 0, shield: 0, seduction: 35, CardTarget.SingleEnemy, "Siphon vital heat directly through contact points: deals 15 Stamina damage, +35% Arousal, and regenerates 8 HP.", CardCategory.LustInstinct, LustPathType.MonsterTransformation, StanceRequirement.Any, staminaDmg: 15, arousalTarget: 35, ephemeral: true));
-                unlockedCards.Add(new CardData("womb_overdrive", "Womb Overdrive", ap: 2, cd: 3, dmg: 0, shield: 0, seduction: 40, CardTarget.SingleEnemy, "Trigger demonic contractions within the Living Crucible: drains 20 Stamina, +40% Arousal, extracts 50ml Cum, and gives 20 Lust Shield.", CardCategory.LustInstinct, LustPathType.MonsterTransformation, StanceRequirement.PenetratedOnly, staminaDmg: 20, arousalTarget: 40, semenMl: 50, lustShield: 20, ephemeral: true, reqSlot: PenetrationSlot.Vagina));
-                unlockedCards.Add(new CardData("tail_caress", "Tail Caress", ap: 1, cd: 1, dmg: 0, shield: 0, seduction: 25, CardTarget.SingleEnemy, "A shadowy demonic tail coils around the foe's groin and inner thighs, dealing 12 Stamina posture damage and +25% Arousal.", CardCategory.LustInstinct, LustPathType.MonsterTransformation, StanceRequirement.Any, staminaDmg: 12, arousalTarget: 25, ephemeral: true));
-                unlockedCards.Add(new CardData("slime_skin_coating", "Slime Skin Coating", ap: 1, cd: 2, dmg: 0, shield: 15, seduction: 0, CardTarget.Self, "Exude a slick, slippery slime membrane across your body: grants 15 Shield, 10 Lust Shield, and slips out of enemy holds.", CardCategory.LustInstinct, LustPathType.MonsterTransformation, StanceRequirement.Any, lustShield: 10, ephemeral: true));
-                unlockedCards.Add(new CardData("primal_metamorphosis", "Primal Metamorphosis", ap: 2, cd: 3, dmg: 0, shield: 0, seduction: 35, CardTarget.Self, "Fully awaken your demonic traits: surge with +25 Lust Shield, heal 12 HP, and send nearby foes into ecstatic frenzy (+35% Arousal).", CardCategory.LustInstinct, LustPathType.MonsterTransformation, StanceRequirement.Any, lustShield: 25, arousalTarget: 35, ephemeral: true));
+                unlockedCards.Add(new CardData("pheromone_spray", "Pheromone Spray", ap: 0, cd: 1, dmg: 0, shield: 0, seduction: 20, CardTarget.SingleEnemy, "Exude sweet, intoxicating succubus pheromones from skin pores (+20% enemy Arousal, 8 Stamina damage).", CardCategory.LustInstinct, LustPathType.MonsterTransformation, StanceRequirement.Any, staminaDmg: 8, arousalTarget: 20, ephemeral: true) { stanceCategory = CardStanceCategory.Neutral });
+                unlockedCards.Add(new CardData("cushioning_bust", "Cushioning Bust", ap: 0, cd: 1, dmg: 0, shield: 12, seduction: 25, CardTarget.Self, "Press your swelling, sensitive bust against the opponent to cushion force (+12 Shield) while driving them mad (+25% Arousal).", CardCategory.LustInstinct, LustPathType.MonsterTransformation, StanceRequirement.Any, arousalTarget: 25, ephemeral: true) { stanceCategory = CardStanceCategory.Grapple });
+                unlockedCards.Add(new CardData("milky_relief", "Milky Relief", ap: 0, cd: 2, dmg: 0, shield: 0, seduction: 0, CardTarget.Self, "Release warm maternal secretions to soothe strained muscle and mind: heals 12 HP, restores 15 Stamina, cools Arousal by 25%.", CardCategory.LustInstinct, LustPathType.MonsterTransformation, StanceRequirement.Any, arousalSelf: -25, ephemeral: true) { stanceCategory = CardStanceCategory.Sex });
+                unlockedCards.Add(new CardData("womb_pulse", "Womb Pulse", ap: 0, cd: 1, dmg: 0, shield: 0, seduction: 30, CardTarget.SingleEnemy, "The demonic Womb Tattoo flares beneath the skin: unleashes an ecstatic shockwave (+30% Arousal) and forms +12 Lust Shield.", CardCategory.LustInstinct, LustPathType.MonsterTransformation, StanceRequirement.Any, arousalTarget: 30, lustShield: 12, ephemeral: true) { stanceCategory = CardStanceCategory.Sex });
+                unlockedCards.Add(new CardData("succubus_siphon", "Succubus Siphon", ap: 0, cd: 2, dmg: 0, shield: 0, seduction: 35, CardTarget.SingleEnemy, "Siphon vital heat directly through contact points: deals 15 Stamina damage, +35% Arousal, and regenerates 8 HP.", CardCategory.LustInstinct, LustPathType.MonsterTransformation, StanceRequirement.Any, staminaDmg: 15, arousalTarget: 35, ephemeral: true) { stanceCategory = CardStanceCategory.Grapple });
+                unlockedCards.Add(new CardData("womb_overdrive", "Womb Overdrive", ap: 0, cd: 3, dmg: 0, shield: 0, seduction: 40, CardTarget.SingleEnemy, "Trigger demonic contractions within the Living Crucible: drains 20 Stamina, +40% Arousal, extracts 50ml Cum, and gives 20 Lust Shield.", CardCategory.LustInstinct, LustPathType.MonsterTransformation, StanceRequirement.PenetratedOnly, staminaDmg: 20, arousalTarget: 40, semenMl: 50, lustShield: 20, ephemeral: true, reqSlot: PenetrationSlot.Vagina) { stanceCategory = CardStanceCategory.Sex });
+                unlockedCards.Add(new CardData("tail_caress", "Tail Caress", ap: 0, cd: 1, dmg: 0, shield: 0, seduction: 25, CardTarget.SingleEnemy, "A shadowy demonic tail coils around the foe's groin and inner thighs, dealing 12 Stamina posture damage and +25% Arousal.", CardCategory.LustInstinct, LustPathType.MonsterTransformation, StanceRequirement.Any, staminaDmg: 12, arousalTarget: 25, ephemeral: true) { stanceCategory = CardStanceCategory.Grapple });
+                unlockedCards.Add(new CardData("slime_skin_coating", "Slime Skin Coating", ap: 0, cd: 2, dmg: 0, shield: 15, seduction: 0, CardTarget.Self, "Exude a slick, slippery slime membrane across your body: grants 15 Shield, 10 Lust Shield, and slips out of enemy holds.", CardCategory.LustInstinct, LustPathType.MonsterTransformation, StanceRequirement.Any, lustShield: 10, ephemeral: true) { stanceCategory = CardStanceCategory.Grapple });
+                unlockedCards.Add(new CardData("primal_metamorphosis", "Primal Metamorphosis", ap: 0, cd: 3, dmg: 0, shield: 0, seduction: 35, CardTarget.Self, "Fully awaken your demonic traits: surge with +25 Lust Shield, heal 12 HP, and send nearby foes into ecstatic frenzy (+35% Arousal).", CardCategory.LustInstinct, LustPathType.MonsterTransformation, StanceRequirement.Any, lustShield: 25, arousalTarget: 35, ephemeral: true) { stanceCategory = CardStanceCategory.Sex });
 
-                // Struggle Actions (Grappled / Penetrated)
-                unlockedCards.Add(new CardData("break_free", "Break Free", ap: 1, cd: 0, dmg: 4, shield: 0, seduction: 0, CardTarget.SingleEnemy, "Struggle vigorously with limbs to dislodge the grapple (deals 14 Stamina damage; escapes to Neutral if enemy stamina depletes).", CardCategory.StruggleAction, LustPathType.None, StanceRequirement.StruggleOnly, staminaDmg: 14));
-                unlockedCards.Add(new CardData("sensual_caress", "Sensual Caress", ap: 1, cd: 0, dmg: 0, shield: 0, seduction: 35, CardTarget.SingleEnemy, "Caress sensitive flanks and thighs, driving the opponent into ecstatic frenzy (+35% enemy Arousal, +10% self Arousal).", CardCategory.StruggleAction, LustPathType.None, StanceRequirement.StruggleOnly, arousalSelf: 10, arousalTarget: 35));
-                unlockedCards.Add(new CardData("shift_leverage", "Shift Leverage", ap: 1, cd: 1, dmg: 0, shield: 8, seduction: 0, CardTarget.Self, "Maneuver your hips and torso to deflect crushing weight, gaining 8 Shield and 8 Lust Shield.", CardCategory.StruggleAction, LustPathType.None, StanceRequirement.StruggleOnly, lustShield: 8));
-                unlockedCards.Add(new CardData("struggle_clinch", "Clinch & Hold", ap: 1, cd: 0, dmg: 0, shield: 6, seduction: 15, CardTarget.SingleEnemy, "Clinch close to leverage body weight against the foe: grants 6 Shield, deals 6 Stamina damage, and stirs 15% Arousal.", CardCategory.StruggleAction, LustPathType.None, StanceRequirement.StruggleOnly, staminaDmg: 6, arousalTarget: 15));
-                unlockedCards.Add(new CardData("counter_clench", "Counter Clench", ap: 1, cd: 1, dmg: 0, shield: 0, seduction: 45, CardTarget.SingleEnemy, "Counter-clamp the embedded shaft with fierce rhythmic spasms, stripping 15 Stamina and dealing 45% Arousal.", CardCategory.StruggleAction, LustPathType.None, StanceRequirement.PenetratedOnly, staminaDmg: 15, arousalTarget: 45, semenMl: 40));
-
-                // External Climax Control Cards (Dictate Climax Zone & Avoid Internal Influx)
-                unlockedCards.Add(new CardData("guiding_palms", "Guiding Palms / Handjob", ap: 1, cd: 1, dmg: 0, shield: 0, seduction: 35, CardTarget.SingleEnemy, "Wrap both palms rhythmically around the foe's member, milking their stroke to direct climax into your hands (+35% Arousal, 12 Stamina dmg).", CardCategory.LustInstinct, LustPathType.None, StanceRequirement.Any, staminaDmg: 12, arousalTarget: 35, finishZone: ExternalFinishZone.Hands));
-                unlockedCards.Add(new CardData("paizuri_clench", "Paizuri Clench", ap: 1, cd: 1, dmg: 0, shield: 0, seduction: 40, CardTarget.SingleEnemy, "Squeeze the adversary's shaft snugly between your soft cleavage, guiding their climax onto your chest (+40% Arousal, +15 Lust Shield).", CardCategory.LustInstinct, LustPathType.None, StanceRequirement.Any, arousalTarget: 40, lustShield: 15, finishZone: ExternalFinishZone.Breasts));
-                unlockedCards.Add(new CardData("thigh_lock", "Thigh Lock", ap: 1, cd: 1, dmg: 0, shield: 0, seduction: 35, CardTarget.SingleEnemy, "Clamp smooth, firm thighs around the enemy's hips and groin, trapping their stroke to climax across your legs (+35% Arousal, +20 Lust Shield).", CardCategory.LustInstinct, LustPathType.None, StanceRequirement.Any, arousalTarget: 35, lustShield: 20, finishZone: ExternalFinishZone.Thighs));
-                unlockedCards.Add(new CardData("parted_lips_tease", "Parted Lips Tease", ap: 1, cd: 1, dmg: 0, shield: 0, seduction: 40, CardTarget.SingleEnemy, "Tilt your head back and present parted lips and flushed cheeks, enticing the enemy to discharge across your face (+40% Arousal, +10 Lust Shield).", CardCategory.LustInstinct, LustPathType.None, StanceRequirement.Any, arousalTarget: 40, lustShield: 10, finishZone: ExternalFinishZone.Face));
-                unlockedCards.Add(new CardData("milking_stroke", "Milking Stroke", ap: 2, cd: 2, dmg: 0, shield: 0, seduction: 60, CardTarget.SingleEnemy, "Frantically milk the opponent's shaft with expert strokes, instantly forcing an external climax! (+60% Arousal, triggers external finish).", CardCategory.LustInstinct, LustPathType.None, StanceRequirement.Any, arousalTarget: 60, finishZone: ExternalFinishZone.Hands, isFinisher: true));
+                // External Climax Control Cards (Dictate Climax Zone & Avoid Internal Influx - Sex Stance)
+                unlockedCards.Add(new CardData("guiding_palms", "Guiding Palms / Handjob", ap: 0, cd: 1, dmg: 0, shield: 0, seduction: 35, CardTarget.SingleEnemy, "Wrap both palms rhythmically around the foe's member, milking their stroke to direct climax into your hands (+35% Arousal, 12 Stamina dmg).", CardCategory.LustInstinct, LustPathType.None, StanceRequirement.Any, staminaDmg: 12, arousalTarget: 35, finishZone: ExternalFinishZone.Hands) { stanceCategory = CardStanceCategory.Sex });
+                unlockedCards.Add(new CardData("paizuri_clench", "Paizuri Clench", ap: 0, cd: 1, dmg: 0, shield: 0, seduction: 40, CardTarget.SingleEnemy, "Squeeze the adversary's shaft snugly between your soft cleavage, guiding their climax onto your chest (+40% Arousal, +15 Lust Shield).", CardCategory.LustInstinct, LustPathType.None, StanceRequirement.Any, arousalTarget: 40, lustShield: 15, finishZone: ExternalFinishZone.Breasts) { stanceCategory = CardStanceCategory.Sex });
+                unlockedCards.Add(new CardData("thigh_lock", "Thigh Lock", ap: 0, cd: 1, dmg: 0, shield: 0, seduction: 35, CardTarget.SingleEnemy, "Clamp smooth, firm thighs around the enemy's hips and groin, trapping their stroke to climax across your legs (+35% Arousal, +20 Lust Shield).", CardCategory.LustInstinct, LustPathType.None, StanceRequirement.Any, arousalTarget: 35, lustShield: 20, finishZone: ExternalFinishZone.Thighs) { stanceCategory = CardStanceCategory.Sex });
+                unlockedCards.Add(new CardData("parted_lips_tease", "Parted Lips Tease", ap: 0, cd: 1, dmg: 0, shield: 0, seduction: 40, CardTarget.SingleEnemy, "Tilt your head back and present parted lips and flushed cheeks, enticing the enemy to discharge across your face (+40% Arousal, +10 Lust Shield).", CardCategory.LustInstinct, LustPathType.None, StanceRequirement.Any, arousalTarget: 40, lustShield: 10, finishZone: ExternalFinishZone.Face) { stanceCategory = CardStanceCategory.Sex });
+                unlockedCards.Add(new CardData("milking_stroke", "Milking Stroke", ap: 0, cd: 2, dmg: 0, shield: 0, seduction: 60, CardTarget.SingleEnemy, "Frantically milk the opponent's shaft with expert strokes, instantly forcing an external climax! (+60% Arousal, triggers external finish).", CardCategory.LustInstinct, LustPathType.None, StanceRequirement.Any, arousalTarget: 60, finishZone: ExternalFinishZone.Hands, isFinisher: true) { stanceCategory = CardStanceCategory.Sex });
             }
 
-            // 2. Populate baseWarriorDeck (load saved deck if available, else fallback to starter)
-            baseWarriorDeck.Clear();
-            string savedDeck = PlayerPrefs.GetString("Sanctum_PlayerEquippedDeck", "");
-            if (!string.IsNullOrEmpty(savedDeck))
+            // 2. Load 3 Stance Sub-Decks
+            LoadStanceDecks();
+        }
+
+        public void LoadStanceDecks()
+        {
+            equippedNeutralDeck.Clear();
+            equippedGrappleDeck.Clear();
+            equippedSexDeck.Clear();
+
+            // 1. Neutral Sub-Deck
+            string savedNeutral = PlayerPrefs.GetString("Sanctum_EquippedDeck_Neutral", "");
+            if (!string.IsNullOrEmpty(savedNeutral))
             {
-                string[] parts = savedDeck.Split(',');
-                foreach (var id in parts)
+                foreach (var id in savedNeutral.Split(','))
                 {
                     if (string.IsNullOrEmpty(id)) continue;
                     var cd = unlockedCards.Find(c => c.id == id.Trim());
-                    if (cd != null && !baseWarriorDeck.Exists(c => c.id == cd.id))
-                    {
-                        baseWarriorDeck.Add(cd);
-                    }
+                    if (cd != null && !equippedNeutralDeck.Exists(c => c.id == cd.id) && equippedNeutralDeck.Count < maxNeutralCards)
+                        equippedNeutralDeck.Add(cd);
                 }
             }
-
-            if (baseWarriorDeck.Count == 0)
+            if (equippedNeutralDeck.Count == 0)
             {
-                if (startingDeckAssets != null && startingDeckAssets.Count > 0)
+                string[] defNeutral = { "punch", "guard", "wait" };
+                foreach (var id in defNeutral)
                 {
-                    HashSet<string> seenDeckIds = new HashSet<string>();
-                    for (int i = 0; i < startingDeckAssets.Count; i++)
-                    {
-                        if (startingDeckAssets[i] != null)
-                        {
-                            var data = startingDeckAssets[i].ToCardData();
-                            if (seenDeckIds.Add(data.id))
-                                baseWarriorDeck.Add(data);
-                        }
-                    }
-                }
-                else
-                {
-                    // Default 4 warrior starter cards
-                    string[] defaultStarter = { "strike", "heavy_slash", "block", "shield_bash" };
-                    foreach (var id in defaultStarter)
-                    {
-                        var cd = unlockedCards.Find(c => c.id == id);
-                        if (cd != null) baseWarriorDeck.Add(cd);
-                    }
+                    var cd = unlockedCards.Find(c => c.id == id);
+                    if (cd != null) equippedNeutralDeck.Add(cd);
                 }
             }
 
+            // 2. Grapple Sub-Deck
+            string savedGrapple = PlayerPrefs.GetString("Sanctum_EquippedDeck_Grapple", "");
+            if (!string.IsNullOrEmpty(savedGrapple))
+            {
+                foreach (var id in savedGrapple.Split(','))
+                {
+                    if (string.IsNullOrEmpty(id)) continue;
+                    var cd = unlockedCards.Find(c => c.id == id.Trim());
+                    if (cd != null && !equippedGrappleDeck.Exists(c => c.id == cd.id) && equippedGrappleDeck.Count < maxGrappleCards)
+                        equippedGrappleDeck.Add(cd);
+                }
+            }
+            if (equippedGrappleDeck.Count == 0)
+            {
+                string[] defGrapple = { "struggle", "shift_weight", "whimper" };
+                foreach (var id in defGrapple)
+                {
+                    var cd = unlockedCards.Find(c => c.id == id);
+                    if (cd != null) equippedGrappleDeck.Add(cd);
+                }
+            }
+
+            // 3. Sex Sub-Deck
+            string savedSex = PlayerPrefs.GetString("Sanctum_EquippedDeck_Sex", "");
+            if (!string.IsNullOrEmpty(savedSex))
+            {
+                foreach (var id in savedSex.Split(','))
+                {
+                    if (string.IsNullOrEmpty(id)) continue;
+                    var cd = unlockedCards.Find(c => c.id == id.Trim());
+                    if (cd != null && !equippedSexDeck.Exists(c => c.id == cd.id) && equippedSexDeck.Count < maxSexCards)
+                        equippedSexDeck.Add(cd);
+                }
+            }
+            if (equippedSexDeck.Count == 0)
+            {
+                string[] defSex = { "endure_breath", "helpless_squirm" };
+                foreach (var id in defSex)
+                {
+                    var cd = unlockedCards.Find(c => c.id == id);
+                    if (cd != null) equippedSexDeck.Add(cd);
+                }
+            }
+
+            // Synchronize legacy equippedDeck and playerDeck
             equippedDeck.Clear();
-            foreach (var cd in baseWarriorDeck)
-            {
-                equippedDeck.Add(new CardInstance(cd));
-            }
+            foreach (var cd in equippedNeutralDeck) equippedDeck.Add(new CardInstance(cd));
+            foreach (var cd in equippedGrappleDeck) equippedDeck.Add(new CardInstance(cd));
+            foreach (var cd in equippedSexDeck) equippedDeck.Add(new CardInstance(cd));
+        }
 
-            playerDeck.Clear();
-            foreach (var cd in baseWarriorDeck)
-            {
-                playerDeck.Add(new CardInstance(cd));
-            }
+        public void SaveStanceDecks()
+        {
+            List<string> nIds = new List<string>();
+            foreach (var c in equippedNeutralDeck) if (c != null) nIds.Add(c.id);
+            PlayerPrefs.SetString("Sanctum_EquippedDeck_Neutral", string.Join(",", nIds));
+
+            List<string> gIds = new List<string>();
+            foreach (var c in equippedGrappleDeck) if (c != null) gIds.Add(c.id);
+            PlayerPrefs.SetString("Sanctum_EquippedDeck_Grapple", string.Join(",", gIds));
+
+            List<string> sIds = new List<string>();
+            foreach (var c in equippedSexDeck) if (c != null) sIds.Add(c.id);
+            PlayerPrefs.SetString("Sanctum_EquippedDeck_Sex", string.Join(",", sIds));
+
+            PlayerPrefs.Save();
         }
 
         public void SetActiveLustPath(LustPathType path)
@@ -402,36 +484,99 @@ namespace UnbridledSanctum.Combat
 
         public bool IsGrappleOccupied(GrappleZone zone = GrappleZone.None)
         {
-            return GetGrapplingEnemy(zone) != null;
+            if (GetGrapplingEnemy(zone) != null) return true;
+
+            // An orifice penetration also locks the corresponding bodily zone!
+            if (enemies != null)
+            {
+                if (zone == GrappleZone.Lower || zone == GrappleZone.None)
+                {
+                    if (enemies.Exists(e => e != null && !e.isDefeated && (e.occupiedSlot == PenetrationSlot.Vagina || e.occupiedSlot == PenetrationSlot.Anal)))
+                        return true;
+                }
+                if (zone == GrappleZone.Upper || zone == GrappleZone.None)
+                {
+                    if (enemies.Exists(e => e != null && !e.isDefeated && e.occupiedSlot == PenetrationSlot.Mouth))
+                        return true;
+                }
+            }
+            return false;
         }
 
         public bool CanGrapple(Combatant enemy, GrappleZone zone = GrappleZone.None)
         {
             if (enemy == null || enemy.isDefeated) return false;
+            if (playerGrappleImmunityTurns > 0) return false;
             if (enemy.isGrapplingPlayer && (zone == GrappleZone.None || enemy.heldGrappleZone == zone)) return true;
-            return !IsGrappleOccupied(zone);
+
+            GrappleZone targetZone = (zone != GrappleZone.None) ? zone : GrappleZone.Lower;
+            var existing = GetGrapplingEnemy(targetZone);
+            if (existing != null && existing != enemy) return false;
+
+            if (targetZone == GrappleZone.Upper)
+            {
+                var mouthOccupant = GetSlotOccupant(PenetrationSlot.Mouth);
+                if (mouthOccupant != null && mouthOccupant != enemy) return false;
+            }
+            else if (targetZone == GrappleZone.Lower)
+            {
+                var vagOccupant = GetSlotOccupant(PenetrationSlot.Vagina);
+                var analOccupant = GetSlotOccupant(PenetrationSlot.Anal);
+                var lowerPen = vagOccupant ?? analOccupant;
+                if (lowerPen != null && lowerPen != enemy) return false;
+            }
+
+            return true;
         }
 
         public bool AssignGrapple(Combatant enemy, GrappleZone zone = GrappleZone.None)
         {
             if (enemy == null || enemy.isDefeated) return false;
+            if (playerGrappleImmunityTurns > 0)
+            {
+                OnCombatLogMessage?.Invoke($"{enemy.name} lunges to grab you, but you remain elusive and dodge the hold! [Grapple Immune]");
+                return false;
+            }
             if (enemy.isGrapplingPlayer && (zone == GrappleZone.None || enemy.heldGrappleZone == zone)) return true;
 
-            var existing = GetGrapplingEnemy(zone);
+            GrappleZone targetZone = (zone != GrappleZone.None) ? zone : GrappleZone.Lower;
+            var existing = GetGrapplingEnemy(targetZone);
             if (existing != null && existing != enemy)
             {
-                string zoneTag = zone == GrappleZone.Upper ? "face and upper body" : "thighs and lower body";
+                string zoneTag = targetZone == GrappleZone.Upper ? "face and upper body" : "thighs and lower body";
                 OnCombatLogMessage?.Invoke($"{enemy.name} attempts to pin you, but {existing.name} is already locking your {zoneTag}!");
                 return false;
             }
 
+            // Also check if slot in this zone is occupied by another enemy via penetration!
+            if (targetZone == GrappleZone.Upper)
+            {
+                var mouthOccupant = GetSlotOccupant(PenetrationSlot.Mouth);
+                if (mouthOccupant != null && mouthOccupant != enemy)
+                {
+                    OnCombatLogMessage?.Invoke($"{enemy.name} attempts to grab your head, but {mouthOccupant.name} is already occupying your mouth!");
+                    return false;
+                }
+            }
+            else if (targetZone == GrappleZone.Lower)
+            {
+                var vagOccupant = GetSlotOccupant(PenetrationSlot.Vagina);
+                var analOccupant = GetSlotOccupant(PenetrationSlot.Anal);
+                var lowerPen = vagOccupant ?? analOccupant;
+                if (lowerPen != null && lowerPen != enemy)
+                {
+                    OnCombatLogMessage?.Invoke($"{enemy.name} attempts to pin your thighs, but {lowerPen.name} is already penetrating your lower sanctum!");
+                    return false;
+                }
+            }
+
             enemy.isGrapplingPlayer = true;
-            enemy.heldGrappleZone = (zone != GrappleZone.None) ? zone : GrappleZone.Lower;
+            enemy.heldGrappleZone = targetZone;
             enemy.occupiedSlot = PenetrationSlot.None;
             TransitionStance(CombatStance.Grappled);
 
             string zoneLog = enemy.heldGrappleZone == GrappleZone.Upper 
-                ? $"{enemy.name} pins your head and face with her hands and weight! [Face Grapple -> Oral Path]" 
+                ? $"{enemy.name} wraps her arms around your neck, pulling your face close! [Neck Clinch -> Oral Path]" 
                 : $"{enemy.name} scissor-locks her thighs tightly around your waist and legs! [Thigh Grapple -> Vaginal Path]";
             OnCombatLogMessage?.Invoke(zoneLog);
             return true;
@@ -440,7 +585,13 @@ namespace UnbridledSanctum.Combat
         public bool CanPenetrateSlot(Combatant enemy, PenetrationSlot slot)
         {
             if (enemy == null || !enemy.canPenetrate || slot == PenetrationSlot.None) return false;
+            if (playerGrappleImmunityTurns > 0) return false;
             if (IsSlotOccupied(slot)) return false; // Strictly 1 enemy per slot
+
+            // Zone conflict check: The bodily zone corresponding to this orifice must NOT be held by a DIFFERENT enemy!
+            GrappleZone targetZone = (slot == PenetrationSlot.Mouth) ? GrappleZone.Upper : GrappleZone.Lower;
+            var occupant = GetGrapplingEnemy(targetZone);
+            if (occupant != null && occupant != enemy) return false;
 
             switch (slot)
             {
@@ -459,6 +610,7 @@ namespace UnbridledSanctum.Combat
             var list = new List<PenetrationSlot>();
             if (player == null) return list;
             if (enemy != null && !enemy.canPenetrate) return list;
+            if (playerGrappleImmunityTurns > 0) return list;
 
             if (player.isLowerTorn)
             {
@@ -477,6 +629,11 @@ namespace UnbridledSanctum.Combat
         public void AssignPenetration(Combatant enemy, PenetrationSlot slot)
         {
             if (enemy == null || slot == PenetrationSlot.None) return;
+            if (playerGrappleImmunityTurns > 0)
+            {
+                OnCombatLogMessage?.Invoke($"{enemy.name} attempts penetration, but you slip away! [Grapple Immune]");
+                return;
+            }
             if (!enemy.canPenetrate)
             {
                 AssignGrapple(enemy);
@@ -491,13 +648,13 @@ namespace UnbridledSanctum.Combat
             }
 
             enemy.occupiedSlot = slot;
-            enemy.isGrapplingPlayer = false;
-            enemy.heldGrappleZone = GrappleZone.None;
+            enemy.isGrapplingPlayer = true;
+            enemy.heldGrappleZone = (slot == PenetrationSlot.Mouth) ? GrappleZone.Upper : GrappleZone.Lower;
             TransitionStance(CombatStance.Penetrated);
             OnCombatLogMessage?.Invoke($"{enemy.name} forcefully penetrates your vessel's {slot.ToString().ToUpper()}! [Slot Claimed]");
         }
 
-        public void ReleaseEnemyHold(Combatant enemy)
+        public void ReleaseEnemyHold(Combatant enemy, bool breakoutToNeutral = false)
         {
             if (enemy == null) return;
             PenetrationSlot prevSlot = enemy.occupiedSlot;
@@ -516,7 +673,21 @@ namespace UnbridledSanctum.Combat
                 OnCombatLogMessage?.Invoke($"{enemy.name}'s hold was broken!");
             }
 
-            UpdateStanceFromCombatants();
+            if (breakoutToNeutral)
+            {
+                ReleaseAllEnemyHolds();
+                playerGrappleImmunityTurns = 1;
+                TransitionStance(CombatStance.Neutral);
+                if (player != null)
+                {
+                    player.currentStamina = Mathf.Max(player.currentStamina, 15);
+                }
+                OnCombatLogMessage?.Invoke("[BREAK FREE] You completely broke out of all holds to Neutral stance! Gained 1-turn grapple immunity!");
+            }
+            else
+            {
+                UpdateStanceFromCombatants();
+            }
         }
 
         public void ReleaseAllEnemyHolds()
@@ -538,6 +709,12 @@ namespace UnbridledSanctum.Combat
 
         public void UpdateStanceFromCombatants()
         {
+            if (playerGrappleImmunityTurns > 0)
+            {
+                TransitionStance(CombatStance.Neutral);
+                return;
+            }
+
             bool anyPenetrating = enemies != null && enemies.Exists(e => !e.isDefeated && e.occupiedSlot != PenetrationSlot.None);
             bool anyGrappling = enemies != null && enemies.Exists(e => !e.isDefeated && e.isGrapplingPlayer);
 
@@ -571,6 +748,23 @@ namespace UnbridledSanctum.Combat
             return list;
         }
 
+        public CardData GetEquippedWeaponCard()
+        {
+            if (characterState != null)
+            {
+                var weaponItem = characterState.GetEquippedItem(EquipSlot.Weapon);
+                if (weaponItem != null && !string.IsNullOrEmpty(weaponItem.grantedCardId))
+                {
+                    var cd = unlockedCards.Find(c => c.id == weaponItem.grantedCardId);
+                    if (cd != null) return cd;
+                }
+            }
+
+            // Fallback: If no weapon item is equipped, use basic unarmed palm strike
+            var unarmed = unlockedCards.Find(c => c.id == "palm_strike");
+            return unarmed ?? unlockedCards.Find(c => c.id == "unarmed_scratch");
+        }
+
         public void BuildTurnHand()
         {
             Dictionary<string, int> cdMap = new Dictionary<string, int>();
@@ -581,107 +775,92 @@ namespace UnbridledSanctum.Combat
 
             playerDeck.Clear();
 
-            // Dynamic base warrior/struggle slots and lust instinct slots (GDD Section 5)
-            // Tier 1: 0% - 30% Arousal -> 4 warrior/struggle, 0 lust instincts
-            // Tier 2: 31% - 60% Arousal -> 4 warrior/struggle, 1 lust instinct
-            // Tier 3: 61% - 85% Arousal -> 3 warrior/struggle, 2 lust instincts (instincts cost -1 AP)
-            // Tier 4: 86% - 100% Arousal -> 2 warrior/struggle, 3 lust instincts (weapon attacks cost +1 AP)
-            int baseActionSlots = 4;
-            int lustCardCount = 0;
-
-            if (player != null)
+            // 1. Build hand based on current stance sub-deck
+            if (currentStance == CombatStance.Neutral)
             {
-                int curArousal = player.arousal;
-                if (curArousal >= 86 || player.seductionStacks >= 3)
+                // Equipped Neutral cards
+                for (int i = 0; i < equippedNeutralDeck.Count; i++)
                 {
-                    baseActionSlots = 2;
-                    lustCardCount = 3;
+                    var cd = equippedNeutralDeck[i];
+                    if (cd != null)
+                    {
+                        var inst = new CardInstance(cd.Clone());
+                        inst.currentCooldown = cardCooldowns.TryGetValue(cd.id, out int cdVal) ? cdVal : 0;
+                        playerDeck.Add(inst);
+                    }
                 }
-                else if (curArousal >= 61 || player.seductionStacks == 2)
+
+                // Guaranteed Innate Weapon / Unarmed Skill (Approach B)
+                CardData weaponSkill = GetEquippedWeaponCard();
+                if (weaponSkill != null && !playerDeck.Exists(c => c.data.id == weaponSkill.id))
                 {
-                    baseActionSlots = 3;
-                    lustCardCount = 2;
-                }
-                else if (curArousal >= 31 || player.seductionStacks == 1)
-                {
-                    baseActionSlots = 4;
-                    lustCardCount = 1;
-                }
-                else
-                {
-                    baseActionSlots = 4;
-                    lustCardCount = 0;
+                    var inst = new CardInstance(weaponSkill.Clone());
+                    inst.currentCooldown = cardCooldowns.TryGetValue(weaponSkill.id, out int cdVal) ? cdVal : 0;
+                    playerDeck.Add(inst);
                 }
             }
-
-            // 1. Stance Swap: In struggle/grapple/penetration, weapon strikes are replaced by Struggle Actions
-            if (currentStance != CombatStance.Neutral)
+            else if (currentStance == CombatStance.Grappled)
             {
-                AddStruggleHand(baseActionSlots);
-            }
-            else
-            {
-                // 2. Neutral Stance: Strictly Add Neutral/Any cards from equippedDeck (NEVER Struggle cards!)
-                // Strictly filter for Neutral-compatible cards!
-                List<CardInstance> neutralValid = equippedDeck.FindAll(c => c?.data != null &&
-                    c.data.category != CardCategory.StruggleAction &&
-                    (c.data.stanceRequirement == StanceRequirement.Any || c.data.stanceRequirement == StanceRequirement.NeutralOnly));
-
-                int count = Mathf.Min(baseActionSlots, neutralValid.Count);
-                for (int i = 0; i < count; i++)
+                // In Grappled stance, Slot 0 is rigidly anchored to Struggle so card slots NEVER jump across turns!
+                var struggleCard = unlockedCards.Find(c => c.id == "struggle");
+                if (struggleCard != null)
                 {
-                    var inst = new CardInstance(neutralValid[i].data.Clone());
-                    inst.currentCooldown = cardCooldowns.TryGetValue(inst.data.id, out int cd) ? cd : 0;
+                    var inst = new CardInstance(struggleCard.Clone());
+                    inst.currentCooldown = cardCooldowns.TryGetValue(struggleCard.id, out int cdVal) ? cdVal : 0;
                     playerDeck.Add(inst);
                 }
 
-                if (playerDeck.Count < baseActionSlots)
+                // Followed by equipped Grapple cards (skipping duplicate struggle if equipped)
+                for (int i = 0; i < equippedGrappleDeck.Count; i++)
                 {
-                    string[] fallbackIds = { "strike", "block", "heavy_slash", "shield_bash" };
-                    foreach (var fid in fallbackIds)
+                    var cd = equippedGrappleDeck[i];
+                    if (cd != null && cd.id != "struggle" && !playerDeck.Exists(c => c.data.id == cd.id))
                     {
-                        if (playerDeck.Count >= baseActionSlots) break;
-                        CardData cd = unlockedCards.Find(c => c.id == fid);
-                        if (cd != null && !playerDeck.Exists(c => c.data.id == fid))
-                        {
-                            var inst = new CardInstance(cd.Clone());
-                            inst.currentCooldown = cardCooldowns.TryGetValue(fid, out int c) ? c : 0;
-                            playerDeck.Add(inst);
-                        }
+                        var inst = new CardInstance(cd.Clone());
+                        inst.currentCooldown = cardCooldowns.TryGetValue(cd.id, out int cdVal) ? cdVal : 0;
+                        playerDeck.Add(inst);
+                    }
+                }
+            }
+            else // Penetrated or ThroatLock (Sex Stance)
+            {
+                // In Sex stance, Slot 0 is ALSO rigidly anchored to Struggle!
+                // Fixed position: Struggle is always Slot 0 whenever held/penetrated.
+                // Unconditional: no arousal gate!
+                var struggleCard = unlockedCards.Find(c => c.id == "struggle");
+                if (struggleCard != null)
+                {
+                    var inst = new CardInstance(struggleCard.Clone());
+                    inst.currentCooldown = cardCooldowns.TryGetValue(struggleCard.id, out int cdVal) ? cdVal : 0;
+                    playerDeck.Add(inst);
+                }
+
+                // Followed by equipped Sex cards at Slot 1, Slot 2, ...
+                for (int i = 0; i < equippedSexDeck.Count; i++)
+                {
+                    var cd = equippedSexDeck[i];
+                    if (cd != null && !playerDeck.Exists(c => c.data.id == cd.id))
+                    {
+                        var inst = new CardInstance(cd.Clone());
+                        inst.currentCooldown = cardCooldowns.TryGetValue(cd.id, out int cdVal) ? cdVal : 0;
+                        playerDeck.Add(inst);
                     }
                 }
             }
 
-            // 3. Dynamic Ephemeral Lust Cards from Chosen Path
-            if (activeLustPath != LustPathType.None && player != null && lustCardCount > 0)
+            // 2. High Lust Intrusion (Desire bleed into hand)
+            // If Vessel Arousal is >= 65%, 1 intrusive sexual card bleeds into Neutral/Grapple!
+            if (player != null && player.arousal >= 65 && currentStance != CombatStance.Penetrated && currentStance != CombatStance.ThroatLock)
             {
-                List<CardData> selectedLustCards = GetSmartContextLustCards(activeLustPath, lustCardCount);
-                for (int i = 0; i < selectedLustCards.Count; i++)
+                if (equippedSexDeck.Count > 0)
                 {
-                    CardData baseCard = selectedLustCards[i];
-                    CardData ephemeralCard = baseCard.Clone();
-                    ephemeralCard.isEphemeral = true;
-
-                    // At Tier 3+ (Arousal >= 61% or seductionStacks >= 2): Lust instinct cards cost -1 AP (min 0)!
-                    if (player.arousal >= 61 || player.seductionStacks >= 2)
+                    var sexCard = equippedSexDeck[UnityEngine.Random.Range(0, equippedSexDeck.Count)];
+                    if (sexCard != null && !playerDeck.Exists(c => c.data.id == sexCard.id))
                     {
-                        ephemeralCard.apCost = Mathf.Max(0, ephemeralCard.apCost - 1);
-                    }
-
-                    CardInstance inst = new CardInstance(ephemeralCard);
-                    inst.currentCooldown = cardCooldowns.TryGetValue(inst.data.id, out int cd) ? cd : 0;
-                    playerDeck.Add(inst);
-                }
-            }
-
-            // High Arousal penalty: Above 85% Arousal (Tier 4), the body trembles from feverish ecstasy: physical attacks cost +1 AP
-            if (player != null && (player.arousal >= 86 || player.seductionStacks >= 2))
-            {
-                foreach (var c in playerDeck)
-                {
-                    if (c.data.category == CardCategory.WarriorTactics && c.data.hpDamage > 0)
-                    {
-                        c.data.apCost = Mathf.Max(1, c.data.apCost + 1);
+                        var inst = new CardInstance(sexCard.Clone());
+                        inst.data.isEphemeral = true;
+                        inst.currentCooldown = cardCooldowns.TryGetValue(sexCard.id, out int cdVal) ? cdVal : 0;
+                        playerDeck.Add(inst);
                     }
                 }
             }
@@ -904,47 +1083,67 @@ namespace UnbridledSanctum.Combat
             return null;
         }
 
+        public List<CardData> GetDeckForStance(CardStanceCategory stance)
+        {
+            switch (stance)
+            {
+                case CardStanceCategory.Neutral: return equippedNeutralDeck;
+                case CardStanceCategory.Grapple: return equippedGrappleDeck;
+                case CardStanceCategory.Sex: return equippedSexDeck;
+                default: return equippedNeutralDeck;
+            }
+        }
+
+        public int GetMaxSlotsForStance(CardStanceCategory stance)
+        {
+            switch (stance)
+            {
+                case CardStanceCategory.Neutral: return maxNeutralCards;
+                case CardStanceCategory.Grapple: return maxGrappleCards;
+                case CardStanceCategory.Sex: return maxSexCards;
+                default: return 3;
+            }
+        }
+
+        public bool AddCardToStanceDeck(CardData card, CardStanceCategory stance)
+        {
+            if (card == null) return false;
+            List<CardData> targetDeck = GetDeckForStance(stance);
+            int maxSlots = GetMaxSlotsForStance(stance);
+
+            if (targetDeck.Count >= maxSlots) return false;
+            if (targetDeck.Exists(c => c != null && c.id == card.id)) return false;
+
+            targetDeck.Add(card);
+            SaveStanceDecks();
+            return true;
+        }
+
+        public bool RemoveCardFromStanceDeck(int index, CardStanceCategory stance)
+        {
+            List<CardData> targetDeck = GetDeckForStance(stance);
+            if (index < 0 || index >= targetDeck.Count) return false;
+
+            targetDeck.RemoveAt(index);
+            SaveStanceDecks();
+            return true;
+        }
+
         public bool AddCardToDeck(CardData card)
         {
             if (card == null) return false;
-            if (baseWarriorDeck.Count >= MAX_DECK_SIZE) return false;
-
-            // Prevent duplicate cards in player's deck
-            for (int i = 0; i < baseWarriorDeck.Count; i++)
-            {
-                if (baseWarriorDeck[i] != null && baseWarriorDeck[i].id == card.id)
-                    return false;
-            }
-
-            baseWarriorDeck.Add(card);
-            equippedDeck.Add(new CardInstance(card));
-            if (!isCombatActive)
-            {
-                playerDeck.Add(new CardInstance(card));
-            }
-            SavePlayerDeck();
-            return true;
+            return AddCardToStanceDeck(card, card.GetStanceCategory());
         }
 
         public bool RemoveCardFromDeck(int index)
         {
-            if (index < 0 || index >= baseWarriorDeck.Count) return false;
-            baseWarriorDeck.RemoveAt(index);
-            if (index < equippedDeck.Count) equippedDeck.RemoveAt(index);
-            if (!isCombatActive && index < playerDeck.Count) playerDeck.RemoveAt(index);
-            SavePlayerDeck();
-            return true;
+            if (index < 0 || index >= equippedNeutralDeck.Count) return false;
+            return RemoveCardFromStanceDeck(index, CardStanceCategory.Neutral);
         }
 
         public void SavePlayerDeck()
         {
-            List<string> ids = new List<string>();
-            foreach (var c in baseWarriorDeck)
-            {
-                if (c != null) ids.Add(c.id);
-            }
-            PlayerPrefs.SetString("Sanctum_PlayerEquippedDeck", string.Join(",", ids));
-            PlayerPrefs.Save();
+            SaveStanceDecks();
         }
 
         public void StartCombat(List<EnemyType> types, int floorLevel = 1)
@@ -1115,14 +1314,12 @@ namespace UnbridledSanctum.Combat
             }
 
             CardInstance card = playerDeck[cardIndex];
-            if (!card.CanPlay(player.currentAp, currentStance))
+            if (!card.CanPlay(1, currentStance))
             {
                 if (card.currentCooldown > 0)
-                    OnCombatLogMessage?.Invoke("Cannot play card: On Cooldown!");
-                else if (player.currentAp < card.data.apCost)
-                    OnCombatLogMessage?.Invoke("Cannot play card: Insufficient AP!");
+                    OnCombatLogMessage?.Invoke("Cannot play action: On Cooldown!");
                 else
-                    OnCombatLogMessage?.Invoke($"Cannot play card: Requires {card.data.stanceRequirement} (Current: {currentStance})!");
+                    OnCombatLogMessage?.Invoke($"Cannot play action: Requires {card.data.stanceRequirement} (Current: {currentStance})!");
                 return false;
             }
 
@@ -1231,29 +1428,67 @@ namespace UnbridledSanctum.Combat
 
                 if (targetEnemy.currentStamina <= 0)
                 {
-                    OnCombatLogMessage?.Invoke($"{targetEnemy.name}'s balance shattered! She is STAGGERED and off-balance!");
+                    OnCombatLogMessage?.Invoke($"{targetEnemy.name}'s balance shattered! Her grip breaks!");
+                    ReleaseEnemyHold(targetEnemy, breakoutToNeutral: true);
                 }
             }
 
-            // Break Free logic
-            if (card.data.id == "break_free")
+            // Break Free & Struggle Logic (1-2 Clicks Max Guaranteed Breakout directly to Neutral)
+            if (card.data.id == "struggle" || card.data.id == "break_free")
             {
-                if (targetEnemy == null || targetEnemy.currentStamina <= 0 || UnityEngine.Random.value < 0.6f)
+                if (currentStance == CombatStance.Grappled || currentStance == CombatStance.Penetrated || currentStance == CombatStance.ThroatLock)
                 {
-                    OnCombatLogMessage?.Invoke("You violently kicked off the ground and broke free!");
-                    if (targetEnemy != null)
+                    bool breakoutSuccess = false;
+                    if (targetEnemy == null || targetEnemy.currentStamina <= 0)
                     {
-                        ReleaseEnemyHold(targetEnemy);
+                        breakoutSuccess = true;
                     }
                     else
                     {
-                        ReleaseAllEnemyHolds();
+                        // 65% base breakout chance on click 1.
+                        // On fail, deal 15 bonus posture damage so the enemy stamina depletes and click 2 is guaranteed 100%!
+                        float roll = UnityEngine.Random.value;
+                        if (roll < 0.65f)
+                        {
+                            breakoutSuccess = true;
+                        }
+                        else
+                        {
+                            targetEnemy.TakeStaminaDamage(15);
+                            if (targetEnemy.currentStamina <= 0)
+                            {
+                                breakoutSuccess = true;
+                            }
+                            else
+                            {
+                                OnCombatLogMessage?.Invoke($"{targetEnemy.name} desperately clamps down ({targetEnemy.currentStamina} stamina left)! One more struggle will break free!");
+                            }
+                        }
+                    }
+
+                    if (breakoutSuccess)
+                    {
+                        OnCombatLogMessage?.Invoke("You violently kicked off and broke free to Neutral stance!");
+                        if (targetEnemy != null)
+                        {
+                            ReleaseEnemyHold(targetEnemy, breakoutToNeutral: true);
+                        }
+                        else
+                        {
+                            ReleaseAllEnemyHolds();
+                            playerGrappleImmunityTurns = 1;
+                            TransitionStance(CombatStance.Neutral);
+                        }
                     }
                 }
-                else
-                {
-                    OnCombatLogMessage?.Invoke("The opponent clamped down tighter, preventing your escape!");
-                }
+            }
+
+            // Wait & Observe Card
+            if (card.data.id == "wait")
+            {
+                int stamGain = 12;
+                player.currentStamina = Mathf.Min(player.maxStamina, player.currentStamina + stamGain);
+                OnCombatLogMessage?.Invoke($"[WAIT & OBSERVE] You hold your ground calmly and observe the opponent's stance (+{stamGain} Stamina, +{card.data.shieldGain} Shield).");
             }
 
             // Standard Shield Gain
@@ -1457,6 +1692,56 @@ namespace UnbridledSanctum.Combat
 
             // Check if play finished the enemy or battle
             CheckEndConditions();
+
+            // RPGM Style (1 skill = 1 turn): Automatically end player turn if combat continues
+            if (isCombatActive && isPlayerTurn && !isActionInProgress)
+            {
+                EndPlayerTurn();
+            }
+        }
+
+        public void ExecuteStanceRestAction()
+        {
+            if (!isPlayerTurn || isActionInProgress || !isCombatActive) return;
+            StartCoroutine(ExecuteStanceRestRoutine());
+        }
+
+        private IEnumerator ExecuteStanceRestRoutine()
+        {
+            isActionInProgress = true;
+            switch (currentStance)
+            {
+                case CombatStance.Neutral:
+                    int sGain = 6;
+                    int stamGain = 12;
+                    player.shield += sGain;
+                    player.currentStamina = Mathf.Min(player.maxStamina, player.currentStamina + stamGain);
+                    OnCombatLogMessage?.Invoke($"[REST] You catch your breath and steady your stance (+{stamGain} Stamina, +{sGain} Shield).");
+                    break;
+
+                case CombatStance.Grappled:
+                    int braceShield = 8;
+                    player.shield += braceShield;
+                    OnCombatLogMessage?.Invoke($"[BRACE] You tense your body and brace against the hold (+{braceShield} Shield).");
+                    break;
+
+                case CombatStance.Penetrated:
+                case CombatStance.ThroatLock:
+                    int lustShieldGain = 10;
+                    player.lustShield += lustShieldGain;
+                    player.arousal = Mathf.Max(0, player.arousal - 10);
+                    OnCombatLogMessage?.Invoke($"[RECEIVE] You relax into the sensation and yield to the motion (+{lustShieldGain} Lust Shield, -10% Arousal).");
+                    break;
+            }
+
+            yield return new WaitForSeconds(0.4f);
+            isActionInProgress = false;
+            OnPlayerActionFinished?.Invoke();
+            CheckEndConditions();
+            if (isCombatActive && isPlayerTurn)
+            {
+                EndPlayerTurn();
+            }
         }
 
         public void ProcessEnemySeduction(Combatant enemy, int sedAmount)
@@ -1683,106 +1968,18 @@ namespace UnbridledSanctum.Combat
 
                 OnCombatLogMessage?.Invoke($"{enemy.name} executes {skill.skillName}!");
 
-                // Stamina / Posture Damage (Struggle Engine)
-                if (skill.staminaDamage > 0)
+                bool isCutsceneSkill = (CustomSexualMovementCGHandler != null && IsCGCutsceneSkill(enemy, skill));
+                Action applyHitEffect = () =>
                 {
-                    player.currentStamina = Mathf.Max(0, player.currentStamina - skill.staminaDamage);
-                    OnCombatLogMessage?.Invoke($"Your stamina was reduced by {skill.staminaDamage}! ({player.currentStamina}/{player.maxStamina} Stamina)");
-                    if (player.currentStamina <= 0 && currentStance == CombatStance.Neutral)
-                    {
-                        enemy.isGrapplingPlayer = true;
-                        TransitionStance(CombatStance.Grappled);
-                        OnCombatLogMessage?.Invoke($"{enemy.name} pins your exhausted vessel to the floor! STANCE SHIFT -> GRAPPLED!");
-                    }
+                    ApplyEnemySkillHit(enemy, skill);
+                };
+
+                if (!isCutsceneSkill)
+                {
+                    applyHitEffect();
                 }
 
-                // Damage to clothes
-                if (skill.clothesDamage > 0 && player.clothesHp > 0)
-                {
-                    bool wasUpperIntact = player.upperClothesHp > 0;
-                    bool wasLowerIntact = player.lowerClothesHp > 0;
-
-                    int cDmg = player.TakeClothesDamage(skill.clothesDamage, skill.armorTarget);
-                    string targetName = player.isWearingCombinedClothes ? "Combined Outfit" :
-                                        (skill.armorTarget == ArmorTargetSlot.Upper ? "Upper Garment" :
-                                        (skill.armorTarget == ArmorTargetSlot.Lower ? "Lower Garment" : "All Garments"));
-                    OnCombatLogMessage?.Invoke($"Your {targetName} suffered {cDmg} durability damage! [U: {player.upperClothesHp}/{player.maxUpperClothesHp} | L: {player.lowerClothesHp}/{player.maxLowerClothesHp}]");
-                    OnClothesDamaged?.Invoke(player, cDmg);
-
-                    if (player.isWearingCombinedClothes)
-                    {
-                        if ((wasUpperIntact || wasLowerIntact) && (player.upperClothesHp <= 0 || player.lowerClothesHp <= 0))
-                        {
-                            OnCombatLogMessage?.Invoke("YOUR COMBINED OUTFIT WAS SHREDDED TO PIECES! Its stat buffs were lost!");
-                            StripCombinedClothes();
-                            yield return new WaitForSeconds(0.4f);
-                        }
-                    }
-                    else
-                    {
-                        bool anyStripped = false;
-                        if (wasUpperIntact && player.upperClothesHp <= 0)
-                        {
-                            OnCombatLogMessage?.Invoke("YOUR UPPER GARMENT WAS SHREDDED TO PIECES! Its stat buffs were lost!");
-                            StripUpperClothes();
-                            anyStripped = true;
-                        }
-                        if (wasLowerIntact && player.lowerClothesHp <= 0)
-                        {
-                            OnCombatLogMessage?.Invoke("YOUR LOWER GARMENT WAS SHREDDED TO PIECES! Its stat buffs were lost!");
-                            StripLowerClothes();
-                            anyStripped = true;
-                        }
-                        if (anyStripped)
-                        {
-                            yield return new WaitForSeconds(0.4f);
-                        }
-                    }
-
-                    persistentMaxHp = player.maxHp;
-                    persistentHp = player.currentHp;
-                }
-
-                // Damage to HP (shield absorbs first - only in Neutral or if skill specifically has hpDamage > 0)
-                if (skill.hpDamage > 0)
-                {
-                    int prevShield = player.shield;
-                    int hpDmg = player.TakeHpDamage(skill.hpDamage);
-                    int absorbed = Mathf.Max(0, prevShield - player.shield);
-
-                    if (absorbed > 0)
-                    {
-                        OnCombatLogMessage?.Invoke($"Your shield absorbed {absorbed} damage! ({player.shield} shield remaining)");
-                    }
-
-                    if (hpDmg > 0)
-                    {
-                        OnCombatLogMessage?.Invoke($"You took {hpDmg} HP damage! ({player.currentHp}/{player.maxHp} HP)");
-                    }
-                    else if (absorbed > 0)
-                    {
-                        if (skill.seductionDamage == 0)
-                            OnCombatLogMessage?.Invoke("Attack was completely blocked by your shield!");
-                        else
-                            OnCombatLogMessage?.Invoke("Shield absorbed physical strike, but lust bypassed your guard!");
-                    }
-
-                    OnDamageDealt?.Invoke(player, hpDmg, absorbed);
-                }
-
-                // Seduction / Arousal (Grapple takedowns are purely physical pins - no arousal damage on initial grab!)
-                bool isGrappleTakedown = (skill.transitionToStance == CombatStance.Grappled);
-                if (skill.seductionDamage > 0 && !isGrappleTakedown)
-                {
-                    int prevPhase = player.seductionStacks;
-                    int sed = player.AddSeduction(skill.seductionDamage);
-                    OnCombatLogMessage?.Invoke($"Your arousal rose by {sed}%! ({player.seduction}% | Stacks: {player.seductionStacks}/3)");
-                    OnSeductionDealt?.Invoke(player, sed);
-                    if (player.seductionStacks != prevPhase)
-                    {
-                        OnSeductionPhaseChanged?.Invoke(player, player.seductionStacks);
-                    }
-                }
+                bool cgPlayedThisTurn = false;
 
                 // Stance transition caused directly by the skill (e.g. deliberate penetration or pounce)
                 if (skill.targetPenetrationSlot != PenetrationSlot.None || skill.transitionToStance == CombatStance.Penetrated)
@@ -1791,7 +1988,11 @@ namespace UnbridledSanctum.Combat
                     {
                         // Even if another enemy holds the player, this enemy CANNOT immediately penetrate from neutral/unattached state!
                         // He must first grab and pin the character!
-                        if (!AssignGrapple(enemy))
+                        GrappleZone neededZone = skill.targetGrappleZone != GrappleZone.None 
+                            ? skill.targetGrappleZone 
+                            : (skill.targetPenetrationSlot == PenetrationSlot.Mouth ? GrappleZone.Upper : GrappleZone.Lower);
+
+                        if (!AssignGrapple(enemy, neededZone))
                         {
                             OnCombatLogMessage?.Invoke($"{enemy.name} joins the attack against your pinned vessel!");
                         }
@@ -1812,6 +2013,13 @@ namespace UnbridledSanctum.Combat
                         if (slot != PenetrationSlot.None && CanPenetrateSlot(enemy, slot))
                         {
                             AssignPenetration(enemy, slot);
+                            cgPlayedThisTurn = true;
+
+                            // Trigger immediate incursion CG sequence on the turn penetration is established
+                            if (CustomSexualMovementCGHandler != null)
+                            {
+                                yield return StartCoroutine(CustomSexualMovementCGHandler(enemy, skill, slot, isCutsceneSkill ? applyHitEffect : null));
+                            }
                         }
                         else
                         {
@@ -1848,13 +2056,16 @@ namespace UnbridledSanctum.Combat
                     // Hook for mini-CG / animation between sexual movements
                     OnSexualMovementExecuted?.Invoke(enemy, skill, enemy.occupiedSlot);
 
-                    if (CustomSexualMovementCGHandler != null)
+                    if (!cgPlayedThisTurn)
                     {
-                        yield return StartCoroutine(CustomSexualMovementCGHandler(enemy, skill, enemy.occupiedSlot));
-                    }
-                    else
-                    {
-                        yield return new WaitForSeconds(sexualMovementPauseDuration);
+                        if (CustomSexualMovementCGHandler != null)
+                        {
+                            yield return StartCoroutine(CustomSexualMovementCGHandler(enemy, skill, enemy.occupiedSlot, isCutsceneSkill ? applyHitEffect : null));
+                        }
+                        else
+                        {
+                            yield return new WaitForSeconds(sexualMovementPauseDuration);
+                        }
                     }
 
                     yield return StartCoroutine(ProcessEnemySeductionRoutine(enemy, enemySelfArousal));
@@ -1881,10 +2092,127 @@ namespace UnbridledSanctum.Combat
             StartPlayerTurn();
         }
 
+        public bool IsCGCutsceneSkill(Combatant enemy, EnemySkill skill)
+        {
+            if (enemy == null || skill == null) return false;
+            if (enemy.enemyType == EnemyType.ElvenScout)
+            {
+                if (skill.targetPenetrationSlot == PenetrationSlot.Mouth || (skill.skillName != null && skill.skillName.IndexOf("Kiss", StringComparison.OrdinalIgnoreCase) >= 0))
+                    return true;
+            }
+            return false;
+        }
+
+        public void ApplyEnemySkillHit(Combatant enemy, EnemySkill skill)
+        {
+            if (player == null || skill == null) return;
+
+            // Stamina / Posture Damage (Struggle Engine)
+            if (skill.staminaDamage > 0)
+            {
+                player.currentStamina = Mathf.Max(0, player.currentStamina - skill.staminaDamage);
+                OnCombatLogMessage?.Invoke($"Your stamina was reduced by {skill.staminaDamage}! ({player.currentStamina}/{player.maxStamina} Stamina)");
+                if (player.currentStamina <= 0)
+                {
+                    OnCombatLogMessage?.Invoke("[POSTURE BROKEN] Your stamina collapsed! You are STAGGERED and off-balance!");
+                }
+            }
+
+            // Damage to clothes
+            if (skill.clothesDamage > 0 && player.clothesHp > 0)
+            {
+                bool wasUpperIntact = player.upperClothesHp > 0;
+                bool wasLowerIntact = player.lowerClothesHp > 0;
+
+                int cDmg = player.TakeClothesDamage(skill.clothesDamage, skill.armorTarget);
+                string targetName = player.isWearingCombinedClothes ? "Combined Outfit" :
+                                    (skill.armorTarget == ArmorTargetSlot.Upper ? "Upper Garment" :
+                                    (skill.armorTarget == ArmorTargetSlot.Lower ? "Lower Garment" : "All Garments"));
+                OnCombatLogMessage?.Invoke($"Your {targetName} suffered {cDmg} durability damage! [U: {player.upperClothesHp}/{player.maxUpperClothesHp} | L: {player.lowerClothesHp}/{player.maxLowerClothesHp}]");
+                OnClothesDamaged?.Invoke(player, cDmg);
+
+                if (player.isWearingCombinedClothes)
+                {
+                    if ((wasUpperIntact || wasLowerIntact) && (player.upperClothesHp <= 0 || player.lowerClothesHp <= 0))
+                    {
+                        OnCombatLogMessage?.Invoke("YOUR COMBINED OUTFIT WAS SHREDDED TO PIECES! Its stat buffs were lost!");
+                        StripCombinedClothes();
+                    }
+                }
+                else
+                {
+                    if (wasUpperIntact && player.upperClothesHp <= 0)
+                    {
+                        OnCombatLogMessage?.Invoke("YOUR UPPER GARMENT WAS SHREDDED TO PIECES! Its stat buffs were lost!");
+                        StripUpperClothes();
+                    }
+                    if (wasLowerIntact && player.lowerClothesHp <= 0)
+                    {
+                        OnCombatLogMessage?.Invoke("YOUR LOWER GARMENT WAS SHREDDED TO PIECES! Its stat buffs were lost!");
+                        StripLowerClothes();
+                    }
+                }
+
+                persistentMaxHp = player.maxHp;
+                persistentHp = player.currentHp;
+            }
+
+            // Damage to HP (shield absorbs first - only in Neutral or if skill specifically has hpDamage > 0)
+            if (skill.hpDamage > 0)
+            {
+                int prevShield = player.shield;
+                int hpDmg = player.TakeHpDamage(skill.hpDamage);
+                int absorbed = Mathf.Max(0, prevShield - player.shield);
+
+                if (absorbed > 0)
+                {
+                    OnCombatLogMessage?.Invoke($"Your shield absorbed {absorbed} damage! ({player.shield} shield remaining)");
+                }
+
+                if (hpDmg > 0)
+                {
+                    OnCombatLogMessage?.Invoke($"You took {hpDmg} HP damage! ({player.currentHp}/{player.maxHp} HP)");
+                }
+                else if (absorbed > 0)
+                {
+                    if (skill.seductionDamage == 0)
+                        OnCombatLogMessage?.Invoke("Attack was completely blocked by your shield!");
+                    else
+                        OnCombatLogMessage?.Invoke("Shield absorbed physical strike, but lust bypassed your guard!");
+                }
+
+                OnDamageDealt?.Invoke(player, hpDmg, absorbed);
+            }
+
+            // Seduction / Arousal (Grapple takedowns are purely physical pins - no arousal damage on initial grab!)
+            bool isGrappleTakedown = (skill.transitionToStance == CombatStance.Grappled);
+            if (skill.seductionDamage > 0 && !isGrappleTakedown)
+            {
+                int prevPhase = player.seductionStacks;
+                int sed = player.AddSeduction(skill.seductionDamage);
+                OnCombatLogMessage?.Invoke($"Your arousal rose by {sed}%! ({player.seduction}% | Stacks: {player.seductionStacks}/3)");
+                OnSeductionDealt?.Invoke(player, sed);
+                if (player.seductionStacks != prevPhase)
+                {
+                    OnSeductionPhaseChanged?.Invoke(player, player.seductionStacks);
+                }
+            }
+        }
+
         private void StartPlayerTurn()
         {
             isPlayerTurn = true;
             currentTurnCombatant = player;
+
+            // Tick down grapple immunity grace window
+            if (playerGrappleImmunityTurns > 0)
+            {
+                playerGrappleImmunityTurns--;
+                if (playerGrappleImmunityTurns == 0)
+                {
+                    OnCombatLogMessage?.Invoke("Grapple immunity has worn off. Beware of enemy holds!");
+                }
+            }
 
             // Shield from previous round expires at the start of player's next turn
             if (player.shield > 0)
@@ -1932,6 +2260,7 @@ namespace UnbridledSanctum.Combat
             ItemData underUpperItem = characterState.GetEquippedItem(EquipSlot.UnderUpper);
             ItemData underLowerItem = characterState.GetEquippedItem(EquipSlot.UnderLower);
             ItemData accessoryItem = characterState.GetEquippedItem(EquipSlot.Accessory);
+            ItemData weaponItem = characterState.GetEquippedItem(EquipSlot.Weapon);
 
             player.upperItem = upperItem;
             player.lowerItem = lowerItem;
@@ -1939,6 +2268,7 @@ namespace UnbridledSanctum.Combat
             player.underLowerItem = underLowerItem;
             player.underwearItem = underLowerItem != null ? underLowerItem : underUpperItem;
             player.accessoryItem = accessoryItem;
+            player.weaponItem = weaponItem;
 
             if (upperItem != null)
             {
@@ -2053,6 +2383,12 @@ namespace UnbridledSanctum.Combat
                 if (accessory != null && accessory != upper && accessory != lower && accessory != underwear)
                 {
                     bonusHp += accessory.bonusMaxHp;
+                }
+
+                ItemData weapon = characterState.GetEquippedItem(EquipSlot.Weapon);
+                if (weapon != null && weapon != upper && weapon != lower && weapon != underwear && weapon != accessory)
+                {
+                    bonusHp += weapon.bonusMaxHp;
                 }
             }
 

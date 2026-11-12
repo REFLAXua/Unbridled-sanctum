@@ -103,6 +103,8 @@ namespace UnbridledSanctum.UI
         public RectTransform enemiesContainer;
         public RectTransform cardsContainer;
         public Button endTurnButton;
+        public TextMeshProUGUI endTurnButtonText;
+        public Image endTurnButtonBg;
         public GameObject endTurnFocusBorder;
         public RectTransform endTurnRect;
 
@@ -133,6 +135,19 @@ namespace UnbridledSanctum.UI
         public Button tertiaryOutcomeBtn;
         public TextMeshProUGUI tertiaryOutcomeBtnText;
 
+        [Header("CG Presentation Overlay")]
+        public GameObject cgOverlayRoot;
+        public CanvasGroup cgCanvasGroup;
+        public Image cgArtImage;
+        public RectTransform cgSquareBox;
+        public RectTransform cgActingEnemyHolder;
+        public GameObject cgDamagePopup;
+        public TextMeshProUGUI cgDamageText;
+        public TextMeshProUGUI cgTitleText;
+        public TextMeshProUGUI cgCaptionText;
+        public Button cgDismissButton;
+        private bool cgSkipRequested = false;
+
         private CombatManager manager;
         private List<EnemyCardUI> enemyCards = new List<EnemyCardUI>();
         private List<CombatCardUI> cardUIs = new List<CombatCardUI>();
@@ -156,6 +171,8 @@ namespace UnbridledSanctum.UI
 
             DisableButtonKeyNavigation();
             ApplyCombatBackground();
+            EnsureCombatLogScrollbar();
+            EnsureCGOverlaySetup();
         }
 
         public void ApplyCombatBackground()
@@ -202,6 +219,10 @@ namespace UnbridledSanctum.UI
                 manager.OnCameraShakeRequested -= HandleCameraShakeRequested;
                 manager.OnEnemyEjaculated -= HandleEnemyEjaculated;
                 manager.OnSexualMovementExecuted -= HandleSexualMovementExecuted;
+                if (manager.CustomSexualMovementCGHandler == HandleSexualMovementCG)
+                {
+                    manager.CustomSexualMovementCGHandler = null;
+                }
             }
 
             manager = combatManager;
@@ -229,6 +250,7 @@ namespace UnbridledSanctum.UI
                 manager.OnCameraShakeRequested += HandleCameraShakeRequested;
                 manager.OnEnemyEjaculated += HandleEnemyEjaculated;
                 manager.OnSexualMovementExecuted += HandleSexualMovementExecuted;
+                manager.CustomSexualMovementCGHandler = HandleSexualMovementCG;
             }
 
             if (endTurnButton != null)
@@ -238,7 +260,7 @@ namespace UnbridledSanctum.UI
                 {
                     if (manager != null && manager.isPlayerTurn && !manager.isActionInProgress)
                     {
-                        manager.EndPlayerTurn();
+                        manager.ExecuteStanceRestAction();
                     }
                 });
             }
@@ -324,18 +346,22 @@ namespace UnbridledSanctum.UI
                 gm.paperDoll.gameObject.SetActive(visible);
             }
 
-            GameObject scenePd = GameObject.Find("PaperDollPanel");
-            if (scenePd != null && (playerAvatarClone == null || scenePd != playerAvatarClone))
-            {
-                scenePd.SetActive(visible);
-            }
-
             PaperDollController[] allPd = FindObjectsByType<PaperDollController>(FindObjectsInactive.Include, FindObjectsSortMode.None);
             foreach (var pd in allPd)
             {
                 if (pd != null && (playerAvatarClone == null || pd.gameObject != playerAvatarClone))
                 {
+                    if (combatPanel != null && pd.transform.IsChildOf(combatPanel.transform)) continue;
                     pd.gameObject.SetActive(visible);
+                }
+            }
+
+            if (combatPanel != null && combatPanel.transform.parent != null)
+            {
+                Transform scenePd = combatPanel.transform.parent.Find("PaperDollPanel");
+                if (scenePd != null && (playerAvatarClone == null || scenePd.gameObject != playerAvatarClone))
+                {
+                    scenePd.gameObject.SetActive(visible);
                 }
             }
         }
@@ -347,9 +373,12 @@ namespace UnbridledSanctum.UI
             if (outcomeModal != null) outcomeModal.SetActive(false);
 
             if (cardsContainer != null) cardsContainer.gameObject.SetActive(true);
-            if (endTurnButton != null) endTurnButton.gameObject.SetActive(true);
+            if (endTurnButton != null) endTurnButton.gameObject.SetActive(false);
             if (playerStatsPanel != null) playerStatsPanel.SetActive(true);
             if (combatLogPanel != null) combatLogPanel.SetActive(true);
+
+            EnsureCombatLogScrollbar();
+            EnsureCGOverlaySetup();
 
             InitOrRefreshPlayerAvatar();
             SetScenePaperDollVisible(false);
@@ -633,6 +662,412 @@ namespace UnbridledSanctum.UI
             RefreshAll();
         }
 
+        private IEnumerator HandleSexualMovementCG(Combatant enemy, EnemySkill skill, PenetrationSlot slot, Action applyDamageCallback)
+        {
+            if (enemy == null) yield break;
+
+            // Scout Kiss CG triggers (Cutscene with choreographed 512x512 popup)
+            if (enemy.enemyType == EnemyType.ElvenScout && (slot == PenetrationSlot.Mouth || (skill != null && skill.skillName.IndexOf("Kiss", StringComparison.OrdinalIgnoreCase) >= 0)))
+            {
+                yield return StartCoroutine(PlayScoutKissCutsceneRoutine(enemy, skill, applyDamageCallback));
+                yield break;
+            }
+            else if (enemy.enemyType == EnemyType.ElvenScout && slot == PenetrationSlot.Vagina)
+            {
+                applyDamageCallback?.Invoke();
+                yield return StartCoroutine(PlayAnimatedCGRoutine(
+                    new string[] { "CG/Scout/cg_scout_fingers_01", "CG/Scout/cg_scout_fingers_02" },
+                    "CG/Scout/cg_scout_fingers",
+                    "ELVEN SCOUT — INVASION OF THE SANCTUM",
+                    "Spreading your trembling thighs across the mossy floor, her agile fingers delve deep into your soaking sanctum, drawing sharp gasps.",
+                    frameDuration: 0.85f,
+                    loopCount: 2
+                ));
+                yield break;
+            }
+
+            // Fallback for types without special CG yet: default pause duration
+            applyDamageCallback?.Invoke();
+            yield return new WaitForSeconds(manager != null ? manager.sexualMovementPauseDuration : 1.4f);
+        }
+
+        public IEnumerator PlayScoutKissCutsceneRoutine(Combatant enemy, EnemySkill skill, Action applyDamageCallback)
+        {
+            EnsureCGOverlaySetup();
+
+            if (cgOverlayRoot == null || cgArtImage == null)
+            {
+                applyDamageCallback?.Invoke();
+                yield return new WaitForSeconds(1.0f);
+                yield break;
+            }
+
+            // 1. Load the 3 frames (512x512)
+            string[] frameNames = new string[] { "cg_scout_kiss_01", "cg_scout_kiss_02", "cg_scout_kiss_03" };
+            Sprite[] frames = new Sprite[3];
+            for (int i = 0; i < 3; i++)
+            {
+                frames[i] = LoadCGSprite("CG/ElvenForest/" + frameNames[i]);
+                if (frames[i] == null) frames[i] = LoadCGSprite("CG/Scout/" + frameNames[i]);
+                if (frames[i] == null) frames[i] = LoadCGSprite("Assets/sprites/CG/ElvenForest/" + frameNames[i] + ".png");
+            }
+
+            if (frames[0] == null)
+            {
+                Debug.LogWarning("[CombatUI] Scout kiss CG frames not found!");
+                applyDamageCallback?.Invoke();
+                yield return new WaitForSeconds(1.0f);
+                yield break;
+            }
+
+            // Find enemy card UI for acting enemy
+            EnemyCardUI actingCard = FindEnemyCardUI(enemy);
+            Transform originalParent = null;
+            int originalSiblingIndex = 0;
+            Vector2 originalAnchoredPos = Vector2.zero;
+            RectTransform cardRt = null;
+
+            if (actingCard != null)
+            {
+                cardRt = actingCard.GetComponent<RectTransform>();
+                originalParent = actingCard.transform.parent;
+                if (originalParent == cgActingEnemyHolder && enemiesContainer != null)
+                {
+                    originalParent = enemiesContainer.transform;
+                }
+                originalSiblingIndex = actingCard.transform.GetSiblingIndex();
+                originalAnchoredPos = cardRt.anchoredPosition;
+            }
+
+            bool damageApplied = false;
+
+            try
+            {
+                cgSkipRequested = false;
+                if (cgDamagePopup != null) cgDamagePopup.SetActive(false);
+
+                // --- 1. Delay 1 second (эльфийка использует поцелуй -> задержка 1 секунда) ---
+                yield return new WaitForSeconds(1.0f);
+
+                // --- 2. Screen dims, enemy moves to right, Frame 1 appears ---
+                if (actingCard != null && cgActingEnemyHolder != null)
+                {
+                    actingCard.transform.SetParent(cgActingEnemyHolder, false);
+                    cardRt.anchoredPosition = Vector2.zero;
+
+                    // Suppress orange halos, auras, and badges during the intimacy cutscene
+                    if (actingCard.turnHalo != null) actingCard.turnHalo.SetActive(false);
+                    if (actingCard.turnAura != null) actingCard.turnAura.SetActive(false);
+                    if (actingCard.targetHalo != null) actingCard.targetHalo.SetActive(false);
+                    if (actingCard.targetAura != null) actingCard.targetAura.SetActive(false);
+                    if (actingCard.statusSquareBadge != null) actingCard.statusSquareBadge.SetActive(false);
+                }
+
+                cgArtImage.sprite = frames[0];
+                cgOverlayRoot.SetActive(true);
+
+                // Fade In Dimmer
+                float fadeDuration = 0.35f;
+                float elapsed = 0f;
+                while (elapsed < fadeDuration && !cgSkipRequested)
+                {
+                    elapsed += Time.deltaTime;
+                    if (cgCanvasGroup != null) cgCanvasGroup.alpha = Mathf.Clamp01(elapsed / fadeDuration);
+                    yield return null;
+                }
+                if (cgCanvasGroup != null) cgCanvasGroup.alpha = 1f;
+
+                // --- 3. Delay 2 seconds on Frame 1 ---
+                float timer = 0f;
+                while (timer < 2.0f && !cgSkipRequested)
+                {
+                    timer += Time.deltaTime;
+                    yield return null;
+                }
+
+                // --- 4. Frame 2 (с легким эффектом дрожания) ---
+                if (frames[1] != null) cgArtImage.sprite = frames[1];
+                TriggerScreenShake(3f, 0.14f);
+
+                // --- 5. Delay 2 seconds on Frame 2 ---
+                timer = 0f;
+                while (timer < 2.0f && !cgSkipRequested)
+                {
+                    timer += Time.deltaTime;
+                    yield return null;
+                }
+
+                // --- 6. Frame 3 (с легким эффектом дрожания) ---
+                if (frames[2] != null) cgArtImage.sprite = frames[2];
+                TriggerScreenShake(4f, 0.16f);
+
+                // --- 7. Delay 1 second on Frame 3 ---
+                timer = 0f;
+                while (timer < 1.0f && !cgSkipRequested)
+                {
+                    timer += Time.deltaTime;
+                    yield return null;
+                }
+
+                // --- 8. Damage resolution (получение урона - отображается слева сверху от квадрата анимации) ---
+                if (!damageApplied)
+                {
+                    damageApplied = true;
+                    applyDamageCallback?.Invoke();
+                }
+
+                // Keep acting card completely unhighlighted during cutscene even after damage events trigger state updates
+                if (actingCard != null)
+                {
+                    if (actingCard.turnHalo != null) actingCard.turnHalo.SetActive(false);
+                    if (actingCard.turnAura != null) actingCard.turnAura.SetActive(false);
+                    if (actingCard.targetHalo != null) actingCard.targetHalo.SetActive(false);
+                    if (actingCard.targetAura != null) actingCard.targetAura.SetActive(false);
+                    if (actingCard.turnBadge != null) actingCard.turnBadge.SetActive(false);
+                    if (actingCard.statusSquareBadge != null) actingCard.statusSquareBadge.SetActive(false);
+                }
+
+                TriggerScreenShake(8f, 0.30f);
+
+                if (cgDamagePopup != null && cgDamageText != null)
+                {
+                    int lustDmg = skill != null && skill.seductionDamage > 0 ? skill.seductionDamage : 28;
+                    int stamDmg = skill != null ? skill.staminaDamage : 8;
+
+                    string txt = $"<color=#FF4081>+{lustDmg}% LUST</color>";
+                    if (stamDmg > 0)
+                    {
+                        txt += $"\n<size=75%><color=#FFA726>-{stamDmg} STAMINA</color></size>";
+                    }
+                    cgDamageText.text = txt;
+                    cgDamagePopup.SetActive(true);
+                    StartCoroutine(AnimateDamagePopup(cgDamagePopup.GetComponent<RectTransform>()));
+                }
+
+                // --- 9. Delay 2 seconds after damage ---
+                timer = 0f;
+                while (timer < 2.0f && !cgSkipRequested)
+                {
+                    timer += Time.deltaTime;
+                    yield return null;
+                }
+
+                // --- 10. Fade Out and return to normal ---
+                elapsed = 0f;
+                while (elapsed < fadeDuration)
+                {
+                    elapsed += Time.deltaTime;
+                    if (cgCanvasGroup != null) cgCanvasGroup.alpha = 1f - Mathf.Clamp01(elapsed / fadeDuration);
+                    yield return null;
+                }
+            }
+            finally
+            {
+                if (!damageApplied)
+                {
+                    damageApplied = true;
+                    applyDamageCallback?.Invoke();
+                }
+
+                if (actingCard != null && originalParent != null && cardRt != null)
+                {
+                    actingCard.transform.SetParent(originalParent, false);
+                    actingCard.transform.SetSiblingIndex(originalSiblingIndex);
+                    cardRt.anchoredPosition = originalAnchoredPos;
+                }
+
+                if (cgDamagePopup != null) cgDamagePopup.SetActive(false);
+                if (cgOverlayRoot != null) cgOverlayRoot.SetActive(false);
+                if (cgCanvasGroup != null) cgCanvasGroup.alpha = 0f;
+                RefreshAll();
+            }
+        }
+
+        private IEnumerator AnimateDamagePopup(RectTransform popupRt)
+        {
+            if (popupRt == null) yield break;
+            popupRt.localScale = new Vector3(0.3f, 0.3f, 1f);
+            float elapsed = 0f;
+            float dur = 0.20f;
+            while (elapsed < dur)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / dur);
+                float scale = Mathf.Lerp(0.3f, 1.25f, t);
+                popupRt.localScale = new Vector3(scale, scale, 1f);
+                yield return null;
+            }
+            elapsed = 0f;
+            dur = 0.12f;
+            while (elapsed < dur)
+            {
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / dur);
+                float scale = Mathf.Lerp(1.25f, 1.0f, t);
+                popupRt.localScale = new Vector3(scale, scale, 1f);
+                yield return null;
+            }
+            popupRt.localScale = Vector3.one;
+        }
+
+        public IEnumerator PlayAnimatedCGRoutine(string[] framePaths, string fallbackPath, string title, string caption, float frameDuration = 0.8f, int loopCount = 2)
+        {
+            if (cgOverlayRoot == null || cgArtImage == null)
+            {
+                yield return new WaitForSeconds(frameDuration * loopCount * 2);
+                yield break;
+            }
+
+            // Load available animation frames
+            List<Sprite> loadedFrames = new List<Sprite>();
+            if (framePaths != null)
+            {
+                for (int i = 0; i < framePaths.Length; i++)
+                {
+                    Sprite s = Resources.Load<Sprite>(framePaths[i]);
+                    if (s != null) loadedFrames.Add(s);
+                }
+            }
+
+            // Fallback to single frame if specific animated frames are not yet generated
+            if (loadedFrames.Count == 0 && !string.IsNullOrEmpty(fallbackPath))
+            {
+                Sprite single = Resources.Load<Sprite>(fallbackPath);
+                if (single != null) loadedFrames.Add(single);
+            }
+
+            if (loadedFrames.Count == 0)
+            {
+                Debug.LogWarning($"[CombatUI] No CG frames found for {fallbackPath}");
+                yield return new WaitForSeconds(1.2f);
+                yield break;
+            }
+
+            cgArtImage.sprite = loadedFrames[0];
+            if (cgTitleText != null) cgTitleText.text = title;
+            if (cgCaptionText != null) cgCaptionText.text = caption;
+
+            cgSkipRequested = false;
+            cgOverlayRoot.SetActive(true);
+
+            // Fade In
+            float fadeDuration = 0.30f;
+            float elapsed = 0f;
+            while (elapsed < fadeDuration)
+            {
+                elapsed += Time.deltaTime;
+                if (cgCanvasGroup != null) cgCanvasGroup.alpha = Mathf.Clamp01(elapsed / fadeDuration);
+                if (cgSkipRequested) break;
+                yield return null;
+            }
+            if (cgCanvasGroup != null) cgCanvasGroup.alpha = 1f;
+
+            // Frame animation loop (or until click to skip)
+            int totalLoops = Mathf.Max(1, loopCount);
+            if (loadedFrames.Count > 1)
+            {
+                for (int loop = 0; loop < totalLoops && !cgSkipRequested; loop++)
+                {
+                    for (int f = 0; f < loadedFrames.Count && !cgSkipRequested; f++)
+                    {
+                        cgArtImage.sprite = loadedFrames[f];
+
+                        // Subtle micro-shake on incursion/climax frame
+                        if (f == loadedFrames.Count - 1)
+                        {
+                            TriggerScreenShake(5f, 0.25f);
+                        }
+
+                        float timer = 0f;
+                        while (timer < frameDuration && !cgSkipRequested)
+                        {
+                            timer += Time.deltaTime;
+                            yield return null;
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // Single static frame hold
+                float holdTimer = 0f;
+                float totalHold = frameDuration * totalLoops * 2f;
+                while (holdTimer < totalHold && !cgSkipRequested)
+                {
+                    holdTimer += Time.deltaTime;
+                    yield return null;
+                }
+            }
+
+            // Fade Out
+            elapsed = 0f;
+            while (elapsed < fadeDuration)
+            {
+                elapsed += Time.deltaTime;
+                if (cgCanvasGroup != null) cgCanvasGroup.alpha = 1f - Mathf.Clamp01(elapsed / fadeDuration);
+                yield return null;
+            }
+
+            cgOverlayRoot.SetActive(false);
+            if (cgCanvasGroup != null) cgCanvasGroup.alpha = 0f;
+        }
+
+        public IEnumerator PlayCGRoutine(string resourcePath, string title, string caption, float displayDuration = 3.0f)
+        {
+            if (cgOverlayRoot == null || cgArtImage == null)
+            {
+                yield return new WaitForSeconds(displayDuration);
+                yield break;
+            }
+
+            Sprite cgSprite = Resources.Load<Sprite>(resourcePath);
+            if (cgSprite == null)
+            {
+                Debug.LogWarning($"[CombatUI] CG sprite not found at Resources/{resourcePath}");
+                yield return new WaitForSeconds(1.2f);
+                yield break;
+            }
+
+            cgArtImage.sprite = cgSprite;
+            if (cgTitleText != null) cgTitleText.text = title;
+            if (cgCaptionText != null) cgCaptionText.text = caption;
+
+            cgSkipRequested = false;
+            cgOverlayRoot.SetActive(true);
+
+            // Fade In
+            float fadeDuration = 0.35f;
+            float elapsed = 0f;
+            while (elapsed < fadeDuration)
+            {
+                elapsed += Time.deltaTime;
+                if (cgCanvasGroup != null) cgCanvasGroup.alpha = Mathf.Clamp01(elapsed / fadeDuration);
+                if (cgSkipRequested) break;
+                yield return null;
+            }
+            if (cgCanvasGroup != null) cgCanvasGroup.alpha = 1f;
+
+            // Display time (or click to skip)
+            float timer = 0f;
+            while (timer < displayDuration && !cgSkipRequested)
+            {
+                timer += Time.deltaTime;
+                yield return null;
+            }
+
+            // Fade Out
+            elapsed = 0f;
+            while (elapsed < fadeDuration)
+            {
+                elapsed += Time.deltaTime;
+                if (cgCanvasGroup != null) cgCanvasGroup.alpha = 1f - Mathf.Clamp01(elapsed / fadeDuration);
+                yield return null;
+            }
+
+            cgOverlayRoot.SetActive(false);
+            if (cgCanvasGroup != null) cgCanvasGroup.alpha = 0f;
+        }
+
         public void TriggerScreenShake(float intensity = 14f, float duration = 0.8f)
         {
             StopCoroutine("ScreenShakeRoutine");
@@ -684,18 +1119,17 @@ namespace UnbridledSanctum.UI
 
         public static Vector2 GetEnemySnakePosition(int index, int totalEnemies)
         {
-            if (totalEnemies <= 1) return new Vector2(0f, 70f);
+            if (totalEnemies <= 1) return new Vector2(0f, 90f);
             if (totalEnemies == 2)
             {
-                return (index == 0) ? new Vector2(-170f, 65f) : new Vector2(170f, 105f);
+                return (index == 0) ? new Vector2(-190f, 85f) : new Vector2(190f, 125f);
             }
-            // 3 enemies: V-formation snake (staggered depth & height)
-            // Raised significantly so their bottom status plates do not overlap with the player's card hand
+            // 3 enemies: V-formation lowered by 40px
             switch (index)
             {
-                case 0: return new Vector2(-280f, 65f); // Front-Left (raised high above card hand)
-                case 1: return new Vector2(0f, 120f);   // Center-Back (depth)
-                case 2: return new Vector2(280f, 75f);  // Front-Right (raised high above card hand)
+                case 0: return new Vector2(-300f, 85f);  // Front-Left
+                case 1: return new Vector2(0f, 140f);    // Center-Back (depth)
+                case 2: return new Vector2(300f, 95f);   // Front-Right
                 default: return Vector2.zero;
             }
         }
@@ -704,7 +1138,7 @@ namespace UnbridledSanctum.UI
         {
             if (enemyCards.Count == 3)
             {
-                // Enemy 1 is in the center-back (Y = +60), so it should be at sibling 0 (behind)
+                // Enemy 1 is in the center-back (Y = +140), so it should be at sibling 0 (behind)
                 if (enemyCards.Count > 1 && enemyCards[1] != null) enemyCards[1].transform.SetSiblingIndex(0);
                 if (enemyCards.Count > 0 && enemyCards[0] != null) enemyCards[0].transform.SetSiblingIndex(1);
                 if (enemyCards.Count > 2 && enemyCards[2] != null) enemyCards[2].transform.SetSiblingIndex(2);
@@ -718,6 +1152,15 @@ namespace UnbridledSanctum.UI
         public void InitOrRefreshPlayerAvatar()
         {
             if (playerAvatarContainer == null) return;
+
+            // Remove any leftover mockups or preview dolls from playerAvatarContainer
+            for (int i = playerAvatarContainer.childCount - 1; i >= 0; i--)
+            {
+                Transform child = playerAvatarContainer.GetChild(i);
+                if (child.name.Contains("TargetHighlight")) continue;
+                if (playerAvatarClone != null && child.gameObject == playerAvatarClone) continue;
+                Destroy(child.gameObject);
+            }
 
             PaperDollController pd = FindFirstObjectByType<PaperDollController>(FindObjectsInactive.Include);
             if (pd != null)
@@ -749,12 +1192,17 @@ namespace UnbridledSanctum.UI
                     pcr.anchorMin = new Vector2(0.5f, 0.5f);
                     pcr.anchorMax = new Vector2(0.5f, 0.5f);
                     pcr.pivot = new Vector2(0.5f, 0.5f);
-                    pcr.sizeDelta = new Vector2(720f, 1080f);
-                    pcr.localScale = new Vector3(0.92f, 0.92f, 1f);
-                    pcr.anchoredPosition = new Vector2(0f, -30f);
+                    pcr.sizeDelta = new Vector2(582f, 873f);
+                    pcr.localScale = Vector3.one;
+                    pcr.anchoredPosition = new Vector2(0f, -10f);
 
                     // Bind ALL layers on the clone by exact child name
                     playerAvatarHairBack = FindImage(playerAvatarClone, "HairBack");
+                    if (playerAvatarHairBack != null)
+                    {
+                        playerAvatarHairBack.enabled = false;
+                        playerAvatarHairBack.gameObject.SetActive(false);
+                    }
                     playerAvatarBody = FindImage(playerAvatarClone, "Body");
                     playerAvatarGroin = FindImage(playerAvatarClone, "Groin");
                     playerAvatarBreast = FindImage(playerAvatarClone, "Breast");
@@ -763,6 +1211,11 @@ namespace UnbridledSanctum.UI
                     playerAvatarClothes = FindImage(playerAvatarClone, "Clothes");
                     playerAvatarEyebrows = FindImage(playerAvatarClone, "Eyebrows");
                     playerAvatarHairFront = FindImage(playerAvatarClone, "HairFront");
+                    if (playerAvatarHairFront != null)
+                    {
+                        playerAvatarHairFront.enabled = false;
+                        playerAvatarHairFront.gameObject.SetActive(false);
+                    }
                     playerAvatarAccessory = FindImage(playerAvatarClone, "Accessory");
                     playerAvatarBlush = FindImage(playerAvatarClone, "Blush");
                     playerAvatarExpression = FindImage(playerAvatarClone, "Expression");
@@ -867,7 +1320,11 @@ namespace UnbridledSanctum.UI
                 }
 
                 // Sync sprites & colors from main PaperDoll (Hair layers disabled for canonical fixed appearance)
-                if (playerAvatarHairBack != null) playerAvatarHairBack.enabled = false;
+                if (playerAvatarHairBack != null)
+                {
+                    playerAvatarHairBack.enabled = false;
+                    playerAvatarHairBack.gameObject.SetActive(false);
+                }
                 SyncImg(playerAvatarBody, pd.bodyImage);
                 SyncImg(playerAvatarGroin, pd.groinImage);
                 SyncImg(playerAvatarBreast, pd.breastImage);
@@ -875,7 +1332,11 @@ namespace UnbridledSanctum.UI
                 SyncImg(playerAvatarLowerClothes, pd.lowerClothesImage);
                 SyncImg(playerAvatarClothes, pd.clothesImage);
                 SyncImg(playerAvatarEyebrows, pd.eyebrowsImage);
-                if (playerAvatarHairFront != null) playerAvatarHairFront.enabled = false;
+                if (playerAvatarHairFront != null)
+                {
+                    playerAvatarHairFront.enabled = false;
+                    playerAvatarHairFront.gameObject.SetActive(false);
+                }
                 SyncImg(playerAvatarAccessory, pd.accessoryImage);
 
                 // Initial clothes visibility (two-phase strip: Outer -> Underwear -> Exposed)
@@ -1533,12 +1994,17 @@ namespace UnbridledSanctum.UI
                 CycleAliveEnemyTarget(1);
             }
 
-            // Direct End Turn hotkey (F key)
+            // Direct Wait & Observe hotkey (F key: triggers Wait card if present in hand)
             if (Input.GetKeyDown(KeyCode.F))
             {
-                if (endTurnButton != null && endTurnButton.interactable)
+                int waitIdx = manager != null && manager.playerDeck != null 
+                    ? manager.playerDeck.FindIndex(c => c?.data != null && c.data.id == "wait") 
+                    : -1;
+                if (waitIdx >= 0)
                 {
-                    endTurnButton.onClick.Invoke();
+                    focusedCardIndex = waitIdx;
+                    UpdateCardVisuals();
+                    OnCardClicked(waitIdx);
                     return;
                 }
             }
@@ -1560,41 +2026,40 @@ namespace UnbridledSanctum.UI
                 }
             }
 
-            int navCount = cardUIs.Count + (endTurnButton != null ? 1 : 0);
+            int navCount = cardUIs.Count;
 
-            // 2. State Machine: Not targeting -> moving between cards and End Turn button
+            // 2. State Machine: Not targeting -> moving between cards
             if (!isTargetingMode)
             {
+                if (navCount > 0)
+                {
+                    // Vertical hand navigation: W/Up moves up, S/Down moves down
+                    if (Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.UpArrow))
+                    {
+                        focusedCardIndex = (focusedCardIndex - 1 + navCount) % navCount;
+                        UpdateCardVisuals();
+                    }
+                    else if (Input.GetKeyDown(KeyCode.S) || Input.GetKeyDown(KeyCode.DownArrow))
+                    {
+                        focusedCardIndex = (focusedCardIndex + 1) % navCount;
+                        UpdateCardVisuals();
+                    }
+                }
+
+                // A/D or Left/Right cycles alive enemies
                 if (Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.LeftArrow))
                 {
-                    focusedCardIndex = (focusedCardIndex - 1 + navCount) % navCount;
-                    UpdateCardVisuals();
+                    CycleAliveEnemyTarget(-1);
                 }
                 else if (Input.GetKeyDown(KeyCode.D) || Input.GetKeyDown(KeyCode.RightArrow))
                 {
-                    focusedCardIndex = (focusedCardIndex + 1) % navCount;
-                    UpdateCardVisuals();
-                }
-                else if (Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.UpArrow))
-                {
                     CycleAliveEnemyTarget(1);
-                }
-                else if (Input.GetKeyDown(KeyCode.S) || Input.GetKeyDown(KeyCode.DownArrow))
-                {
-                    CycleAliveEnemyTarget(-1);
                 }
                 else if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter) || Input.GetKeyDown(KeyCode.Space))
                 {
                     if (focusedCardIndex >= 0 && focusedCardIndex < cardUIs.Count)
                     {
                         OnCardClicked(focusedCardIndex);
-                    }
-                    else if (focusedCardIndex == cardUIs.Count)
-                    {
-                        if (endTurnButton != null && endTurnButton.interactable)
-                        {
-                            endTurnButton.onClick.Invoke();
-                        }
                     }
                 }
             }
@@ -1670,12 +2135,10 @@ namespace UnbridledSanctum.UI
             if (index < 0 || index >= manager.playerDeck.Count) return;
 
             CardInstance card = manager.playerDeck[index];
-            if (!card.CanPlay(manager.player.currentAp, manager.currentStance))
+            if (!card.CanPlay(1, manager.currentStance))
             {
                 if (card.currentCooldown > 0)
-                    HandleCombatLog($"Card '{card.data.cardName}' is on cooldown ({card.currentCooldown}t left)!");
-                else if (manager.player.currentAp < card.data.apCost)
-                    HandleCombatLog($"Not enough AP to play '{card.data.cardName}' (Requires {card.data.apCost} AP, have {manager.player.currentAp})!");
+                    HandleCombatLog($"Action '{card.data.cardName}' is on cooldown ({card.currentCooldown}t left)!");
                 else
                     HandleCombatLog($"Cannot play '{card.data.cardName}' in {manager.currentStance} stance! (Requires {card.data.stanceRequirement})");
                 return;
@@ -2300,7 +2763,7 @@ namespace UnbridledSanctum.UI
 
             if (playerApText != null)
             {
-                playerApText.text = $"{p.currentAp} / {p.maxAp}";
+                playerApText.text = "1 ACT";
             }
 
             if (playerCorruptionText != null)
@@ -2332,10 +2795,10 @@ namespace UnbridledSanctum.UI
                 playerTargetHighlight.SetActive(isSelfTarget);
             }
 
-            // End Turn Button interactability
+            // Turn pass is completely card-based (Wait & Observe card); external End Turn button is inactive
             if (endTurnButton != null)
             {
-                endTurnButton.interactable = manager.isPlayerTurn && !manager.isActionInProgress;
+                endTurnButton.gameObject.SetActive(false);
             }
 
             // Refresh Enemy Cards (Only highlight enemies if a SingleEnemy card is selected!)
@@ -2343,16 +2806,28 @@ namespace UnbridledSanctum.UI
                                     selectedCardIndex < manager.playerDeck.Count &&
                                     manager.playerDeck[selectedCardIndex].data.target == CardTarget.SingleEnemy;
 
-            bool isAnyEnemyTurnActive = manager != null && !manager.isPlayerTurn && manager.currentTurnCombatant != null && !manager.currentTurnCombatant.isPlayer;
+            bool isCGActive = (cgOverlayRoot != null && cgOverlayRoot.activeSelf);
+            bool isAnyEnemyTurnActive = !isCGActive && manager != null && !manager.isPlayerTurn && manager.currentTurnCombatant != null && !manager.currentTurnCombatant.isPlayer;
 
             for (int i = 0; i < enemyCards.Count; i++)
             {
                 if (i < manager.enemies.Count)
                 {
                     Combatant enemy = manager.enemies[i];
-                    bool isTargeted = isEnemyTargeting && (i == focusedEnemyIndex);
-                    bool isActiveTurn = isAnyEnemyTurnActive && (manager.currentTurnCombatant == enemy);
+                    bool isTargeted = !isCGActive && isEnemyTargeting && (i == focusedEnemyIndex);
+                    bool isActiveTurn = !isCGActive && isAnyEnemyTurnActive && (manager.currentTurnCombatant == enemy);
                     enemyCards[i].Refresh(enemy, isTargeted, isEnemyTargeting, isActiveTurn, isAnyEnemyTurnActive);
+
+                    // Suppress any highlight artifacts on enemy during an active intimacy cutscene
+                    if (isCGActive && (enemyCards[i].transform.parent == cgActingEnemyHolder || (manager.currentTurnCombatant == enemy)))
+                    {
+                        if (enemyCards[i].turnHalo != null) enemyCards[i].turnHalo.SetActive(false);
+                        if (enemyCards[i].turnAura != null) enemyCards[i].turnAura.SetActive(false);
+                        if (enemyCards[i].targetHalo != null) enemyCards[i].targetHalo.SetActive(false);
+                        if (enemyCards[i].targetAura != null) enemyCards[i].targetAura.SetActive(false);
+                        if (enemyCards[i].turnBadge != null) enemyCards[i].turnBadge.SetActive(false);
+                        if (enemyCards[i].statusSquareBadge != null) enemyCards[i].statusSquareBadge.SetActive(false);
+                    }
                 }
             }
 
@@ -2808,7 +3283,7 @@ namespace UnbridledSanctum.UI
             cardObj.transform.SetParent(parent, false);
 
             RectTransform rt = cardObj.GetComponent<RectTransform>();
-            rt.sizeDelta = new Vector2(430f, 740f);
+            rt.sizeDelta = new Vector2(480f, 820f); // Proportionally larger enemy scale
 
             // 1. Transparent click hit area covering the entire body
             Image clickArea = cardObj.AddComponent<Image>();
@@ -2819,7 +3294,6 @@ namespace UnbridledSanctum.UI
             btn.targetGraphic = clickArea;
             btn.onClick.AddListener(onClick);
 
-            // 2. Ground Reticle / Aura for Target Selection (under feet, no box frame)
             // 2. Ground Halo for Target Selection (under feet, sleek ellipse glow, NO text)
             GameObject haloObj = new GameObject("TargetHalo", typeof(RectTransform));
             haloObj.transform.SetParent(cardObj.transform, false);
@@ -2827,11 +3301,11 @@ namespace UnbridledSanctum.UI
             haloImg.color = new Color(1f, 0.88f, 0.35f, 0.45f);
             haloImg.raycastTarget = false;
             RectTransform srt = haloObj.GetComponent<RectTransform>();
-            srt.anchorMin = new Vector2(0.5f, 0.12f);
-            srt.anchorMax = new Vector2(0.5f, 0.12f);
+            srt.anchorMin = new Vector2(0.5f, 0.05f);
+            srt.anchorMax = new Vector2(0.5f, 0.05f);
             srt.pivot = new Vector2(0.5f, 0.5f);
             srt.anchoredPosition = Vector2.zero;
-            srt.sizeDelta = new Vector2(250f, 22f);
+            srt.sizeDelta = new Vector2(280f, 24f);
             haloObj.SetActive(false);
 
             // 2b. Character Aura Glow (glows softly behind the body when targeted, NO text)
@@ -2841,11 +3315,11 @@ namespace UnbridledSanctum.UI
             auraImg.color = new Color(1f, 0.85f, 0.25f, 0.22f);
             auraImg.raycastTarget = false;
             RectTransform art = auraObj.GetComponent<RectTransform>();
-            art.anchorMin = new Vector2(0.5f, 0.12f);
-            art.anchorMax = new Vector2(0.5f, 0.90f);
+            art.anchorMin = new Vector2(0.5f, 0.05f);
+            art.anchorMax = new Vector2(0.5f, 0.96f);
             art.pivot = new Vector2(0.5f, 0f);
             art.anchoredPosition = Vector2.zero;
-            art.sizeDelta = new Vector2(380f, 0f);
+            art.sizeDelta = new Vector2(440f, 0f);
             auraObj.SetActive(false);
 
             // 2c. Ground Halo for Active Turn (under feet, soft warm amber glow)
@@ -2855,11 +3329,11 @@ namespace UnbridledSanctum.UI
             turnHaloImg.color = new Color(1f, 0.65f, 0.25f, 0.35f);
             turnHaloImg.raycastTarget = false;
             RectTransform thrt = turnHaloObj.GetComponent<RectTransform>();
-            thrt.anchorMin = new Vector2(0.5f, 0.12f);
-            thrt.anchorMax = new Vector2(0.5f, 0.12f);
+            thrt.anchorMin = new Vector2(0.5f, 0.05f);
+            thrt.anchorMax = new Vector2(0.5f, 0.05f);
             thrt.pivot = new Vector2(0.5f, 0.5f);
             thrt.anchoredPosition = Vector2.zero;
-            thrt.sizeDelta = new Vector2(260f, 24f);
+            thrt.sizeDelta = new Vector2(290f, 26f);
             turnHaloObj.SetActive(false);
 
             // 2d. Character Aura for Active Turn (glows gently behind body)
@@ -2869,14 +3343,14 @@ namespace UnbridledSanctum.UI
             turnAuraImg.color = new Color(1f, 0.58f, 0.20f, 0.18f);
             turnAuraImg.raycastTarget = false;
             RectTransform tart = turnAuraObj.GetComponent<RectTransform>();
-            tart.anchorMin = new Vector2(0.5f, 0.12f);
-            tart.anchorMax = new Vector2(0.5f, 0.90f);
+            tart.anchorMin = new Vector2(0.5f, 0.05f);
+            tart.anchorMax = new Vector2(0.5f, 0.96f);
             tart.pivot = new Vector2(0.5f, 0f);
             tart.anchoredPosition = Vector2.zero;
-            tart.sizeDelta = new Vector2(390f, 0f);
+            tart.sizeDelta = new Vector2(450f, 0f);
             turnAuraObj.SetActive(false);
 
-            // 3. Full-Height Character Sprite (Standing freely, NO card box, NO mask!)
+            // 3. Full-Height Character Sprite (Standing freely, proportionally scaled)
             GameObject pSpriteObj = new GameObject("FullBodySprite", typeof(RectTransform));
             pSpriteObj.transform.SetParent(cardObj.transform, false);
             AspectRatioFitter arf = pSpriteObj.AddComponent<AspectRatioFitter>();
@@ -2887,11 +3361,11 @@ namespace UnbridledSanctum.UI
             pImg.preserveAspect = true;
             pImg.raycastTarget = false;
             RectTransform psrt = pSpriteObj.GetComponent<RectTransform>();
-            psrt.anchorMin = new Vector2(0.5f, 0.12f);
-            psrt.anchorMax = new Vector2(0.5f, 0.90f);
+            psrt.anchorMin = new Vector2(0.5f, 0.05f);
+            psrt.anchorMax = new Vector2(0.5f, 0.96f);
             psrt.pivot = new Vector2(0.5f, 0f);
             psrt.anchoredPosition = Vector2.zero;
-            psrt.sizeDelta = new Vector2(420f, 0f);
+            psrt.sizeDelta = new Vector2(480f, 0f);
 
             // Red Hit Flash Overlay on Enemy
             GameObject hfObj = new GameObject("HitFlashOverlay", typeof(RectTransform));
@@ -2987,7 +3461,7 @@ namespace UnbridledSanctum.UI
             telTrt.sizeDelta = Vector2.zero;
             telObj.SetActive(false);
 
-            // 6. Sleek Floating Status Plate (Under feet)
+            // 6. Sleek Floating Status Plate (Under feet - slim single-row box, positioned by user layout)
             GameObject statusPlate = new GameObject("StatusPlate", typeof(RectTransform));
             statusPlate.transform.SetParent(cardObj.transform, false);
             Image spBg = statusPlate.AddComponent<Image>();
@@ -3000,45 +3474,49 @@ namespace UnbridledSanctum.UI
             }
             else
             {
-                spBg.color = new Color(0.08f, 0.10f, 0.14f, 0.88f);
+                spBg.color = new Color(0.08f, 0.10f, 0.14f, 0.92f);
             }
             spBg.raycastTarget = false;
             RectTransform sprt = statusPlate.GetComponent<RectTransform>();
-            sprt.anchorMin = new Vector2(0.5f, 0.05f);
-            sprt.anchorMax = new Vector2(0.5f, 0.05f);
+            sprt.anchorMin = new Vector2(0.5f, 0.0f);
+            sprt.anchorMax = new Vector2(0.5f, 0.0f);
             sprt.pivot = new Vector2(0.5f, 0.5f);
-            sprt.anchoredPosition = Vector2.zero;
-            sprt.sizeDelta = new Vector2(260f, 64f);
+            sprt.anchoredPosition = new Vector2(0f, -20f); // Clean spacing under boots
+            sprt.sizeDelta = new Vector2(250f, 50f); // Box size from scene layout
 
-            // HP Text (Cleanly inset within dark inner cavity, clear of 16px top wooden border)
+            // Horizontal layout for HP and Seduction inside status plate (-60 spacing from user scene layout)
+            HorizontalLayoutGroup sphlg = statusPlate.AddComponent<HorizontalLayoutGroup>();
+            sphlg.padding = new RectOffset(10, 10, 4, 4);
+            sphlg.spacing = -60f;
+            sphlg.childAlignment = TextAnchor.MiddleCenter;
+            sphlg.childControlWidth = false;
+            sphlg.childControlHeight = true;
+            sphlg.childForceExpandWidth = true;
+            sphlg.childForceExpandHeight = true;
+
+            // HP Text (Left side of status plate)
             GameObject hpObj = new GameObject("HPText", typeof(RectTransform));
             hpObj.transform.SetParent(statusPlate.transform, false);
             TextMeshProUGUI hpTxt = hpObj.AddComponent<TextMeshProUGUI>();
             hpTxt.fontSize = 13;
             hpTxt.fontStyle = FontStyles.Bold;
-            hpTxt.alignment = TextAlignmentOptions.Center;
+            hpTxt.alignment = TextAlignmentOptions.MidlineLeft;
             hpTxt.color = new Color(0.35f, 0.90f, 0.45f, 1f);
             hpTxt.raycastTarget = false;
             RectTransform hrt = hpObj.GetComponent<RectTransform>();
-            hrt.anchorMin = new Vector2(0.06f, 0.50f);
-            hrt.anchorMax = new Vector2(0.94f, 1.0f);
-            hrt.offsetMin = Vector2.zero;
-            hrt.offsetMax = new Vector2(0f, -14f);
+            hrt.sizeDelta = new Vector2(105f, 30f);
 
-            // Seduction Text (Cleanly inset within dark inner cavity, clear of 16px bottom wooden border)
+            // Seduction Text (Right side of status plate)
             GameObject sedObj = new GameObject("SedText", typeof(RectTransform));
             sedObj.transform.SetParent(statusPlate.transform, false);
             TextMeshProUGUI sedTxt = sedObj.AddComponent<TextMeshProUGUI>();
             sedTxt.fontSize = 12;
             sedTxt.fontStyle = FontStyles.Bold;
-            sedTxt.alignment = TextAlignmentOptions.Center;
+            sedTxt.alignment = TextAlignmentOptions.MidlineRight;
             sedTxt.color = new Color(1f, 0.50f, 0.80f, 1f);
             sedTxt.raycastTarget = false;
             RectTransform srt2 = sedObj.GetComponent<RectTransform>();
-            srt2.anchorMin = new Vector2(0.06f, 0.0f);
-            srt2.anchorMax = new Vector2(0.94f, 0.50f);
-            srt2.offsetMin = new Vector2(0f, 14f);
-            srt2.offsetMax = Vector2.zero;
+            srt2.sizeDelta = new Vector2(115f, 30f);
 
             GameObject mpObj = new GameObject("MPText", typeof(RectTransform));
             mpObj.transform.SetParent(statusPlate.transform, false);
@@ -3138,7 +3616,7 @@ namespace UnbridledSanctum.UI
             cardObj.transform.SetParent(parent, false);
 
             RectTransform rt = cardObj.GetComponent<RectTransform>();
-            rt.sizeDelta = new Vector2(150f, 210f);
+            rt.sizeDelta = new Vector2(130f, 175f); // Compact vertical card (from 150x210)
 
             Canvas cardCanvas = cardObj.AddComponent<Canvas>();
             cardCanvas.overrideSorting = false;
@@ -3168,20 +3646,25 @@ namespace UnbridledSanctum.UI
 
             Button btn = cardObj.AddComponent<Button>();
             btn.targetGraphic = bg;
+            btn.transition = Selectable.Transition.ColorTint;
+            ColorBlock cb = btn.colors;
+            cb.normalColor = Color.white;
+            cb.highlightedColor = new Color(1.18f, 1.15f, 1.08f, 1f); // Wardrobe illumination
+            cb.pressedColor = new Color(0.70f, 0.68f, 0.65f, 1f);
+            cb.selectedColor = Color.white; // Prevents button sticking to tinted color after click
+            cb.fadeDuration = 0.08f;
+            btn.colors = cb;
             btn.onClick.AddListener(onClick);
 
-            // Selection / Focus Glowing Border (Glows brighter gold on hover/select)
+            // Refined Wardrobe-style Outline (non-intrusive contour, zero quad fill)
+            Outline cardOutline = visualRootObj.AddComponent<Outline>();
+            cardOutline.enabled = false;
+            cardOutline.effectColor = new Color(0.85f, 0.70f, 0.35f, 0.75f);
+            cardOutline.effectDistance = new Vector2(1.5f, -1.5f);
+
+            // Legacy filled quad kept hidden
             GameObject borderObj = new GameObject("SelectBorder", typeof(RectTransform));
             borderObj.transform.SetParent(visualRootObj.transform, false);
-            Image borderImg = borderObj.AddComponent<Image>();
-            borderImg.color = new Color(1f, 0.90f, 0.35f, 1f);
-            borderImg.raycastTarget = false;
-            RectTransform brt = borderObj.GetComponent<RectTransform>();
-            brt.anchorMin = Vector2.zero;
-            brt.anchorMax = Vector2.one;
-            brt.offsetMin = new Vector2(-4.5f, -4.5f);
-            brt.offsetMax = new Vector2(4.5f, 4.5f);
-            borderObj.transform.SetAsFirstSibling();
             borderObj.SetActive(false);
 
             // Permanent Resting Card Frame / Border (Styled by Card Category: Warrior Gold, Lust Pink, Struggle Amber)
@@ -3316,7 +3799,7 @@ namespace UnbridledSanctum.UI
             GameObject apInner = new GameObject("Inner", typeof(RectTransform));
             apInner.transform.SetParent(apObj.transform, false);
             Image apBg = apInner.AddComponent<Image>();
-            apBg.color = new Color(0.95f, 0.74f, 0.18f, 1f);
+            apBg.color = card.data.cooldownTurns > 0 ? new Color(0.85f, 0.45f, 0.20f, 1f) : new Color(0.35f, 0.75f, 0.45f, 1f);
             apBg.raycastTarget = false;
             RectTransform apir = apInner.GetComponent<RectTransform>();
             apir.anchorMin = Vector2.zero;
@@ -3327,35 +3810,34 @@ namespace UnbridledSanctum.UI
             GameObject apTxtObj = new GameObject("Text", typeof(RectTransform));
             apTxtObj.transform.SetParent(apInner.transform, false);
             TextMeshProUGUI apTxt = apTxtObj.AddComponent<TextMeshProUGUI>();
-            apTxt.text = $"{card.data.apCost}";
-            apTxt.fontSize = 17;
+            apTxt.text = card.data.cooldownTurns > 0 ? $"{card.data.cooldownTurns}t" : "0";
+            apTxt.fontSize = 12;
             apTxt.fontStyle = FontStyles.Bold;
             apTxt.alignment = TextAlignmentOptions.Center;
-            apTxt.color = Color.black;
+            apTxt.color = Color.white;
             apTxt.raycastTarget = false;
             RectTransform aptr = apTxtObj.GetComponent<RectTransform>();
             aptr.anchorMin = Vector2.zero;
             aptr.anchorMax = Vector2.one;
             aptr.sizeDelta = Vector2.zero;
 
-            // Name Plate (Bottom Banner)
+            // Name Plate (Bottom Banner with dark solid grounding)
             GameObject nameObj = new GameObject("NamePlate", typeof(RectTransform));
             nameObj.transform.SetParent(visualRootObj.transform, false);
             Image nameBg = nameObj.AddComponent<Image>();
+            nameBg.color = new Color(0.06f, 0.08f, 0.12f, 0.94f);
             nameBg.raycastTarget = false;
             RectTransform nrt = nameObj.GetComponent<RectTransform>();
 
             if (cardFrameSprite != null)
             {
-                nameBg.color = Color.clear;
-                nrt.anchorMin = new Vector2(0.14f, 0.08f);
-                nrt.anchorMax = new Vector2(0.86f, 0.28f);
+                nrt.anchorMin = new Vector2(0.12f, 0.07f);
+                nrt.anchorMax = new Vector2(0.88f, 0.29f);
                 nrt.offsetMin = Vector2.zero;
                 nrt.offsetMax = Vector2.zero;
             }
             else
             {
-                nameBg.color = new Color(0.04f, 0.04f, 0.06f, 1f);
                 nrt.anchorMin = new Vector2(0f, 0f);
                 nrt.anchorMax = new Vector2(1f, 0f);
                 nrt.pivot = new Vector2(0.5f, 0f);
@@ -3407,12 +3889,15 @@ namespace UnbridledSanctum.UI
 
             CombatCardUI cui = cardObj.AddComponent<CombatCardUI>();
             cui.btn = btn;
+            cui.cardBg = bg;
+            cui.cardOutline = cardOutline;
             cui.cdOverlay = cdObj;
             cui.cdText = cdTxt;
             cui.selectedBorder = borderObj;
             cui.visualRoot = vrRt;
             cui.cardCanvas = cardCanvas;
             cui.cardIndex = index;
+            return cardObj;
             return cardObj;
         }
 
@@ -3662,15 +4147,15 @@ namespace UnbridledSanctum.UI
             ui.playerSkillBanner = psbObj;
             ui.playerSkillBannerText = psbt;
 
-            // --- 4a. Player Avatar Container (Heroine on Battlefield - shifted safely right to clear combat log) ---
+            // --- 4a. Player Avatar Container (Heroine on Battlefield - Left side, smaller scale) ---
             GameObject playerAvatarObj = new GameObject("PlayerAvatarContainer", typeof(RectTransform));
             playerAvatarObj.transform.SetParent(panelObj.transform, false);
             RectTransform part = playerAvatarObj.GetComponent<RectTransform>();
             part.anchorMin = new Vector2(0f, 0.5f);
             part.anchorMax = new Vector2(0f, 0.5f);
             part.pivot = new Vector2(0.5f, 0.5f);
-            part.anchoredPosition = new Vector2(530f, 40f);
-            part.sizeDelta = new Vector2(460f, 720f);
+            part.anchoredPosition = new Vector2(260f, -20f); // Cleanly on the left
+            part.sizeDelta = new Vector2(340f, 530f); // Compact scale (~75% of original 460x720)
             ui.playerAvatarContainer = part;
 
             // Click target on player avatar for Self cards
@@ -3695,7 +4180,7 @@ namespace UnbridledSanctum.UI
             pHaloRt.anchorMin = new Vector2(0.5f, 0.05f);
             pHaloRt.anchorMax = new Vector2(0.5f, 0.05f);
             pHaloRt.pivot = new Vector2(0.5f, 0.5f);
-            pHaloRt.sizeDelta = new Vector2(280f, 24f);
+            pHaloRt.sizeDelta = new Vector2(240f, 20f);
 
             GameObject pAuraObj = new GameObject("PlayerTargetAura", typeof(RectTransform));
             pAuraObj.transform.SetParent(pRetObj.transform, false);
@@ -3706,31 +4191,32 @@ namespace UnbridledSanctum.UI
             pAuraRt.anchorMin = new Vector2(0.5f, 0.5f);
             pAuraRt.anchorMax = new Vector2(0.5f, 0.5f);
             pAuraRt.pivot = new Vector2(0.5f, 0.5f);
-            pAuraRt.sizeDelta = new Vector2(440f, 680f);
+            pAuraRt.sizeDelta = new Vector2(380f, 580f);
 
             pRetObj.SetActive(false);
             ui.playerTargetHighlight = pRetObj;
 
-            // --- 4b. Player Status HUD (Top Left, transparent background) ---
+            // --- 4b. Player Status HUD (Top Left, 3 stats in a compact horizontal row: HP, Seduction, Corruption) ---
             GameObject playerStatsObj = new GameObject("PlayerStatsPanel", typeof(RectTransform));
             playerStatsObj.transform.SetParent(panelObj.transform, false);
             RectTransform psr = playerStatsObj.GetComponent<RectTransform>();
             psr.anchorMin = new Vector2(0f, 1f);
             psr.anchorMax = new Vector2(0f, 1f);
             psr.pivot = new Vector2(0f, 1f);
-            psr.anchoredPosition = new Vector2(20f, -74f);
-            psr.sizeDelta = new Vector2(330f, 440f);
+            psr.anchoredPosition = new Vector2(25f, -74f);
+            psr.sizeDelta = new Vector2(580f, 52f);
             ui.playerStatsPanel = playerStatsObj;
 
-            VerticalLayoutGroup vlg = playerStatsObj.AddComponent<VerticalLayoutGroup>();
-            vlg.padding = new RectOffset(4, 4, 4, 4);
-            vlg.spacing = 8f;
-            vlg.childControlWidth = true;
-            vlg.childControlHeight = false;
-            vlg.childForceExpandWidth = true;
-            vlg.childForceExpandHeight = false;
+            HorizontalLayoutGroup phlg = playerStatsObj.AddComponent<HorizontalLayoutGroup>();
+            phlg.padding = new RectOffset(4, 4, 2, 2);
+            phlg.spacing = 20f; // Clear spacing between stats - zero overlap
+            phlg.childAlignment = TextAnchor.MiddleLeft;
+            phlg.childControlWidth = false;
+            phlg.childControlHeight = true;
+            phlg.childForceExpandWidth = false;
+            phlg.childForceExpandHeight = true;
 
-            // Floating Tooltip Popup (fixed position to the right of enlarged stats panel)
+            // Floating Tooltip Popup
             GameObject tipObj = new GameObject("StatTooltipPopup", typeof(RectTransform));
             tipObj.transform.SetParent(panelObj.transform, false);
             Image tipBg = tipObj.AddComponent<Image>();
@@ -3744,7 +4230,7 @@ namespace UnbridledSanctum.UI
             tipRt.anchorMin = new Vector2(0f, 1f);
             tipRt.anchorMax = new Vector2(0f, 1f);
             tipRt.pivot = new Vector2(0f, 1f);
-            tipRt.anchoredPosition = new Vector2(340f, -74f);
+            tipRt.anchoredPosition = new Vector2(25f, -135f);
 
             GameObject tipTxtObj = new GameObject("Text", typeof(RectTransform));
             tipTxtObj.transform.SetParent(tipObj.transform, false);
@@ -3763,37 +4249,49 @@ namespace UnbridledSanctum.UI
             tipPopup.panel = tipObj;
             tipPopup.text = tipTxt;
             tipPopup.rectTransform = tipRt;
-            tipPopup.SetFixedPosition(new Vector2(340f, -74f));
+            tipPopup.SetFixedPosition(new Vector2(25f, -135f));
             tipObj.SetActive(false);
             ui.statTooltipPopup = tipPopup;
 
-            Vector2 statIconSize = new Vector2(44f, 44f);
-            // 7 Stat Rows with Icon Sprites and Tooltips
-            ui.playerHpText = StatRowFactory.Create(playerStatsObj.transform, StatIconDatabase.HpIcon, "HP", new Color(0.75f, 0.15f, 0.20f, 0.95f), "Health Points (HP):\nYour vital stamina. If reduced to 0, corruption activates.", "30 / 30", new Color(0.35f, 0.90f, 0.45f, 1f), tipPopup, statIconSize);
-            // Hide clothing rows from in-combat HUD (visual-first: clothing condition rendered directly on Paper Doll character avatar)
-            ui.playerUpperClothesText = StatRowFactory.Create(playerStatsObj.transform, StatIconDatabase.TopArmorIcon, "U-ARM", new Color(0.20f, 0.55f, 0.85f, 0.95f), "Upper Armor (U-ARM):\nDurability of your upper garment. Protects your chest and provides damage reduction.", "65 / 65", new Color(0.40f, 0.80f, 1f, 1f), tipPopup, statIconSize);
-            ui.playerLowerClothesText = StatRowFactory.Create(playerStatsObj.transform, StatIconDatabase.BottomArmorIcon, "L-ARM", new Color(0.18f, 0.45f, 0.75f, 0.95f), "Lower Armor (L-ARM):\nDurability of your lower garment. Protects your legs and modesty, and provides damage reduction.", "65 / 65", new Color(0.40f, 0.80f, 1f, 1f), tipPopup, statIconSize);
+            Vector2 statIconSize = new Vector2(36f, 36f);
+            // 3 essential stats in compact horizontal row: HP, LUST, CORRUPTION (with clear non-overlapping widths)
+            ui.playerHpText = StatRowFactory.Create(playerStatsObj.transform, StatIconDatabase.HpIcon, "HP", new Color(0.75f, 0.15f, 0.20f, 0.95f), "Health Points (HP):\nYour physical stamina. If reduced to 0, corruption activates.", "30 / 30", new Color(0.35f, 0.90f, 0.45f, 1f), tipPopup, statIconSize);
+            SetStatRowSize(ui.playerHpText, 150f, 198f);
+
+            ui.playerSeductionText = StatRowFactory.Create(playerStatsObj.transform, StatIconDatabase.LustIcon, "LUST", new Color(0.75f, 0.20f, 0.55f, 0.95f), "Lust / Seduction:\nReaching 100% triggers climax submission and adds a Climax stack!", "0%  (0/3)", new Color(1f, 0.45f, 0.75f, 1f), tipPopup, statIconSize);
+            SetStatRowSize(ui.playerSeductionText, 140f, 188f);
+
+            ui.playerCorruptionText = StatRowFactory.Create(playerStatsObj.transform, StatIconDatabase.CorruptionIcon, "CORR", new Color(0.50f, 0.15f, 0.65f, 0.95f), "Corruption:\nDefeat adds +1 Corruption and preserves you with 1 HP. If it reaches 3/3, you are fully consumed!", "0 / 3", new Color(0.85f, 0.45f, 0.95f, 1f), tipPopup, statIconSize);
+            SetStatRowSize(ui.playerCorruptionText, 90f, 138f);
+
+            // Hidden dummy rows so references remain non-null without displaying on screen
+            ui.playerUpperClothesText = StatRowFactory.Create(playerStatsObj.transform, StatIconDatabase.TopArmorIcon, "U-ARM", Color.clear, "", "", Color.clear, tipPopup, statIconSize);
+            ui.playerLowerClothesText = StatRowFactory.Create(playerStatsObj.transform, StatIconDatabase.BottomArmorIcon, "L-ARM", Color.clear, "", "", Color.clear, tipPopup, statIconSize);
             if (ui.playerUpperClothesText != null && ui.playerUpperClothesText.transform.parent != null)
                 ui.playerUpperClothesText.transform.parent.gameObject.SetActive(false);
             if (ui.playerLowerClothesText != null && ui.playerLowerClothesText.transform.parent != null)
                 ui.playerLowerClothesText.transform.parent.gameObject.SetActive(false);
             ui.playerClothesText = ui.playerUpperClothesText;
-            ui.playerShieldText = StatRowFactory.Create(playerStatsObj.transform, StatIconDatabase.BlockIcon, "SHD", new Color(0.12f, 0.55f, 0.65f, 0.95f), "Shield Guard:\nAbsorbs incoming physical damage before Health is affected.", "0", new Color(0.40f, 0.90f, 1f, 1f), tipPopup, statIconSize);
-            ui.playerSeductionText = StatRowFactory.Create(playerStatsObj.transform, StatIconDatabase.LustIcon, "LUST", new Color(0.75f, 0.20f, 0.55f, 0.95f), "Lust / Seduction:\nReaching 100% triggers climax submission and adds a Climax stack!", "0%  (0/3)", new Color(1f, 0.45f, 0.75f, 1f), tipPopup, statIconSize);
-            ui.playerApText = StatRowFactory.Create(playerStatsObj.transform, StatIconDatabase.ApIcon, "AP", new Color(0.80f, 0.65f, 0.12f, 0.95f), "Action Points (AP):\nEnergy spent to play cards each turn. Fully restored every turn.", "3 / 3", new Color(1f, 0.85f, 0.25f, 1f), tipPopup, statIconSize);
-            ui.playerCorruptionText = StatRowFactory.Create(playerStatsObj.transform, StatIconDatabase.CorruptionIcon, "CORR", new Color(0.50f, 0.15f, 0.65f, 0.95f), "Corruption:\nDefeat adds +1 Corruption and preserves you with 1 HP. If it reaches 3/3, you are fully consumed!", "0 / 3", new Color(0.85f, 0.45f, 0.95f, 1f), tipPopup, statIconSize);
 
-            // --- 4c. Bottom-Left Collapsible Combat Log Panel ---
+            ui.playerShieldText = StatRowFactory.Create(playerStatsObj.transform, StatIconDatabase.BlockIcon, "SHD", Color.clear, "", "", Color.clear, tipPopup, statIconSize);
+            if (ui.playerShieldText != null && ui.playerShieldText.transform.parent != null)
+                ui.playerShieldText.transform.parent.gameObject.SetActive(false);
+
+            ui.playerApText = StatRowFactory.Create(playerStatsObj.transform, StatIconDatabase.ApIcon, "AP", Color.clear, "", "", Color.clear, tipPopup, statIconSize);
+            if (ui.playerApText != null && ui.playerApText.transform.parent != null)
+                ui.playerApText.transform.parent.gameObject.SetActive(false);
+
+            // --- 4c. Combat Log Panel (Bottom-Right corner) ---
             GameObject logPanelObj = new GameObject("CombatLogPanel", typeof(RectTransform));
             logPanelObj.transform.SetParent(panelObj.transform, false);
             Image logBg = logPanelObj.AddComponent<Image>();
             logBg.color = new Color(0.06f, 0.08f, 0.11f, 0.92f);
             RectTransform logRt = logPanelObj.GetComponent<RectTransform>();
-            logRt.anchorMin = new Vector2(0f, 0f);
-            logRt.anchorMax = new Vector2(0f, 0f);
-            logRt.pivot = new Vector2(0f, 0f);
-            logRt.anchoredPosition = new Vector2(25f, 25f);
-            logRt.sizeDelta = new Vector2(360f, 195f);
+            logRt.anchorMin = new Vector2(1f, 0f);
+            logRt.anchorMax = new Vector2(1f, 0f);
+            logRt.pivot = new Vector2(1f, 0f);
+            logRt.anchoredPosition = new Vector2(-15f, 15f); // Bottom-right corner
+            logRt.sizeDelta = new Vector2(360f, 175f);
             ui.combatLogPanel = logPanelObj;
 
             // Header Bar
@@ -3861,14 +4359,14 @@ namespace UnbridledSanctum.UI
             RectTransform svr = svObj.GetComponent<RectTransform>();
             svr.anchorMin = Vector2.zero;
             svr.anchorMax = Vector2.one;
-            svr.offsetMin = new Vector2(6f, 6f);
-            svr.offsetMax = new Vector2(-6f, -36f);
+            svr.offsetMin = new Vector2(8f, 8f);
+            svr.offsetMax = new Vector2(-8f, -36f);
 
             ScrollRect sRect = svObj.AddComponent<ScrollRect>();
             sRect.horizontal = false;
             sRect.vertical = true;
             sRect.movementType = ScrollRect.MovementType.Clamped;
-            sRect.scrollSensitivity = 25f;
+            sRect.scrollSensitivity = 30f;
 
             // Viewport
             GameObject vpObj = new GameObject("Viewport", typeof(RectTransform));
@@ -3876,7 +4374,13 @@ namespace UnbridledSanctum.UI
             RectTransform vpr = vpObj.GetComponent<RectTransform>();
             vpr.anchorMin = Vector2.zero;
             vpr.anchorMax = Vector2.one;
-            vpr.sizeDelta = Vector2.zero;
+            vpr.offsetMin = Vector2.zero;
+            vpr.offsetMax = new Vector2(-14f, 0f); // Space for vertical scrollbar
+
+            Image vpImg = vpObj.AddComponent<Image>();
+            vpImg.color = Color.clear;
+            vpImg.raycastTarget = true; // Allows mouse wheel scrolling anywhere in the viewport
+
             RectMask2D mask = vpObj.AddComponent<RectMask2D>();
             sRect.viewport = vpr;
 
@@ -3884,13 +4388,14 @@ namespace UnbridledSanctum.UI
             GameObject contentObj = new GameObject("Content", typeof(RectTransform));
             contentObj.transform.SetParent(vpObj.transform, false);
             RectTransform crt = contentObj.GetComponent<RectTransform>();
-            crt.anchorMin = new Vector2(0f, 0f);
-            crt.anchorMax = new Vector2(1f, 0f);
-            crt.pivot = new Vector2(0.5f, 0f);
+            crt.anchorMin = new Vector2(0f, 1f);
+            crt.anchorMax = new Vector2(1f, 1f);
+            crt.pivot = new Vector2(0.5f, 1f);
+            crt.anchoredPosition = Vector2.zero;
             crt.sizeDelta = new Vector2(0f, 0f);
 
             VerticalLayoutGroup clg = contentObj.AddComponent<VerticalLayoutGroup>();
-            clg.padding = new RectOffset(6, 6, 4, 4);
+            clg.padding = new RectOffset(4, 4, 4, 4);
             clg.spacing = 3f;
             clg.childControlWidth = true;
             clg.childControlHeight = true;
@@ -3902,37 +4407,80 @@ namespace UnbridledSanctum.UI
             csf.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
 
             sRect.content = crt;
+
+            // Vertical Scrollbar (Slim sleek scrollbar matching UI theme)
+            GameObject sbObj = new GameObject("ScrollbarVertical", typeof(RectTransform));
+            sbObj.transform.SetParent(svObj.transform, false);
+            RectTransform sbrt = sbObj.GetComponent<RectTransform>();
+            sbrt.anchorMin = new Vector2(1f, 0f);
+            sbrt.anchorMax = new Vector2(1f, 1f);
+            sbrt.pivot = new Vector2(1f, 0.5f);
+            sbrt.anchoredPosition = Vector2.zero;
+            sbrt.sizeDelta = new Vector2(8f, 0f);
+
+            Image sbTrack = sbObj.AddComponent<Image>();
+            sbTrack.color = new Color(0.10f, 0.12f, 0.16f, 0.65f);
+
+            GameObject saObj = new GameObject("SlidingArea", typeof(RectTransform));
+            saObj.transform.SetParent(sbObj.transform, false);
+            RectTransform sart = saObj.GetComponent<RectTransform>();
+            sart.anchorMin = Vector2.zero;
+            sart.anchorMax = Vector2.one;
+            sart.sizeDelta = Vector2.zero;
+
+            GameObject handleObj = new GameObject("Handle", typeof(RectTransform));
+            handleObj.transform.SetParent(saObj.transform, false);
+            RectTransform hrt = handleObj.GetComponent<RectTransform>();
+            hrt.sizeDelta = Vector2.zero;
+            Image hImg = handleObj.AddComponent<Image>();
+            hImg.color = new Color(0.40f, 0.45f, 0.55f, 0.85f);
+
+            Scrollbar sb = sbObj.AddComponent<Scrollbar>();
+            sb.targetGraphic = hImg;
+            sb.handleRect = hrt;
+            sb.direction = Scrollbar.Direction.BottomToTop;
+
+            ColorBlock scb = sb.colors;
+            scb.normalColor = new Color(0.40f, 0.45f, 0.55f, 0.85f);
+            scb.highlightedColor = new Color(0.70f, 0.75f, 0.90f, 1f);
+            scb.pressedColor = new Color(0.30f, 0.35f, 0.45f, 1f);
+            scb.fadeDuration = 0.08f;
+            sb.colors = scb;
+
+            sRect.verticalScrollbar = sb;
+            sRect.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.Permanent;
+
             ui.combatLogScrollRect = sRect;
             ui.combatLogContent = crt;
 
-            // --- 5. Enemies Container (Center/Right area - Free placement for Snake layout) ---
+            // --- 5. Enemies Container (Centered on screen, lowered down) ---
             GameObject enemiesObj = new GameObject("EnemiesContainer", typeof(RectTransform));
             enemiesObj.transform.SetParent(panelObj.transform, false);
             RectTransform er = enemiesObj.GetComponent<RectTransform>();
-            er.anchorMin = new Vector2(0.5f, 0.50f);
-            er.anchorMax = new Vector2(0.5f, 0.50f);
+            er.anchorMin = new Vector2(0.5f, 0.44f);
+            er.anchorMax = new Vector2(0.5f, 0.44f);
             er.pivot = new Vector2(0.5f, 0.5f);
-            er.anchoredPosition = new Vector2(300f, 50f);
-            er.sizeDelta = new Vector2(1100f, 760f);
+            er.anchoredPosition = new Vector2(40f, -15f); // Balanced horizontally, lowered down
+            er.sizeDelta = new Vector2(900f, 740f);
             ui.enemiesContainer = er;
 
-            // --- 6. Cards Hand Container (Lowered close to bottom edge) ---
+            // --- 6. Cards Hand Container (Far-Right Border, shifted higher above bottom-right log, compact size) ---
             GameObject cardsObj = new GameObject("CardsContainer", typeof(RectTransform));
             cardsObj.transform.SetParent(panelObj.transform, false);
             RectTransform cr = cardsObj.GetComponent<RectTransform>();
-            cr.anchorMin = new Vector2(0.5f, 0f);
-            cr.anchorMax = new Vector2(0.5f, 0f);
-            cr.pivot = new Vector2(0.5f, 0f);
-            cr.anchoredPosition = new Vector2(90f, 10f);
-            cr.sizeDelta = new Vector2(800f, 215f);
+            cr.anchorMin = new Vector2(1f, 1f);
+            cr.anchorMax = new Vector2(1f, 1f);
+            cr.pivot = new Vector2(1f, 1f);
+            cr.anchoredPosition = new Vector2(-15f, -74f); // Top-right area, clear of bottom log
+            cr.sizeDelta = new Vector2(150f, 720f);
 
-            HorizontalLayoutGroup chlg = cardsObj.AddComponent<HorizontalLayoutGroup>();
-            chlg.spacing = 16;
-            chlg.childAlignment = TextAnchor.LowerCenter;
-            chlg.childControlWidth = false;
-            chlg.childControlHeight = false;
-            chlg.childForceExpandWidth = false;
-            chlg.childForceExpandHeight = false;
+            VerticalLayoutGroup cvlg = cardsObj.AddComponent<VerticalLayoutGroup>();
+            cvlg.spacing = 10;
+            cvlg.childAlignment = TextAnchor.UpperRight;
+            cvlg.childControlWidth = false;
+            cvlg.childControlHeight = false;
+            cvlg.childForceExpandWidth = false;
+            cvlg.childForceExpandHeight = false;
             ui.cardsContainer = cr;
 
             // --- 7. End Turn Button (Bottom Right) ---
@@ -3987,6 +4535,9 @@ namespace UnbridledSanctum.UI
             etObj.AddComponent<EndTurnButtonUI>();
 
             ui.endTurnButton = etBtn;
+            ui.endTurnButtonText = etTxt;
+            ui.endTurnButtonBg = etBg;
+            etObj.SetActive(false);
 
             // --- 8. Outcome Modal (Popup Dialog Centered) ---
             GameObject modalObj = new GameObject("OutcomeModal", typeof(RectTransform));
@@ -4099,9 +4650,135 @@ namespace UnbridledSanctum.UI
             modalObj.SetActive(false);
             ui.outcomeModal = modalObj;
 
+            // --- 9. Fullscreen CG Presentation Overlay ---
+            GameObject cgRoot = new GameObject("CGOverlayRoot", typeof(RectTransform));
+            cgRoot.transform.SetParent(panelObj.transform, false);
+            Canvas cgCanvas = cgRoot.AddComponent<Canvas>();
+            cgCanvas.overrideSorting = true;
+            cgCanvas.sortingOrder = 300; // Above modal and all combat UI
+            cgRoot.AddComponent<GraphicRaycaster>();
+
+            RectTransform cgRt = cgRoot.GetComponent<RectTransform>();
+            cgRt.anchorMin = Vector2.zero;
+            cgRt.anchorMax = Vector2.one;
+            cgRt.sizeDelta = Vector2.zero;
+
+            CanvasGroup cgCg = cgRoot.AddComponent<CanvasGroup>();
+            cgCg.alpha = 0f;
+            ui.cgCanvasGroup = cgCg;
+
+            // Fullscreen backdrop dimmer
+            GameObject cgBackdrop = new GameObject("Dimmer", typeof(RectTransform));
+            cgBackdrop.transform.SetParent(cgRoot.transform, false);
+            RectTransform bdRt = cgBackdrop.GetComponent<RectTransform>();
+            bdRt.anchorMin = Vector2.zero;
+            bdRt.anchorMax = Vector2.one;
+            bdRt.sizeDelta = Vector2.zero;
+            Image bdImg = cgBackdrop.AddComponent<Image>();
+            bdImg.color = new Color(0.02f, 0.02f, 0.04f, 0.94f);
+
+            // Center 512x512 Square Animation Box
+            GameObject cgSquareBox = new GameObject("CGSquareBox", typeof(RectTransform));
+            cgSquareBox.transform.SetParent(cgRoot.transform, false);
+            RectTransform cgBoxRt = cgSquareBox.GetComponent<RectTransform>();
+            cgBoxRt.anchorMin = new Vector2(0.5f, 0.5f);
+            cgBoxRt.anchorMax = new Vector2(0.5f, 0.5f);
+            cgBoxRt.pivot = new Vector2(0.5f, 0.5f);
+            cgBoxRt.anchoredPosition = Vector2.zero;
+            cgBoxRt.sizeDelta = new Vector2(512f, 512f);
+            Image sqBg = cgSquareBox.AddComponent<Image>();
+            sqBg.color = new Color(0.08f, 0.10f, 0.14f, 1f);
+            Outline sqOl = cgSquareBox.AddComponent<Outline>();
+            sqOl.effectColor = new Color(0.85f, 0.70f, 0.35f, 0.85f);
+            sqOl.effectDistance = new Vector2(2f, -2f);
+            ui.cgSquareBox = cgBoxRt;
+
+            // CG Art Image inside 512x512 box
+            GameObject cgArtObj = new GameObject("CGImage", typeof(RectTransform));
+            cgArtObj.transform.SetParent(cgSquareBox.transform, false);
+            RectTransform artRt = cgArtObj.GetComponent<RectTransform>();
+            artRt.anchorMin = Vector2.zero;
+            artRt.anchorMax = Vector2.one;
+            artRt.offsetMin = new Vector2(2f, 2f);
+            artRt.offsetMax = new Vector2(-2f, -2f);
+            Image artImg = cgArtObj.AddComponent<Image>();
+            artImg.preserveAspect = true;
+            ui.cgArtImage = artImg;
+
+            // Damage Popup at top-left of the 512x512 box
+            GameObject dmgPopupObj = new GameObject("CGDamagePopup", typeof(RectTransform));
+            dmgPopupObj.transform.SetParent(cgSquareBox.transform, false);
+            RectTransform dpRt = dmgPopupObj.GetComponent<RectTransform>();
+            dpRt.anchorMin = new Vector2(0f, 1f);
+            dpRt.anchorMax = new Vector2(0f, 1f);
+            dpRt.pivot = new Vector2(1f, 0f);
+            dpRt.anchoredPosition = new Vector2(-20f, 20f);
+            dpRt.sizeDelta = new Vector2(280f, 90f);
+            Image dpBg = dmgPopupObj.AddComponent<Image>();
+            dpBg.color = new Color(0.08f, 0.05f, 0.10f, 0.92f);
+            Outline dpOl = dmgPopupObj.AddComponent<Outline>();
+            dpOl.effectColor = new Color(1f, 0.35f, 0.65f, 0.95f);
+            dpOl.effectDistance = new Vector2(2f, -2f);
+
+            GameObject dpTxtObj = new GameObject("Text", typeof(RectTransform));
+            dpTxtObj.transform.SetParent(dmgPopupObj.transform, false);
+            RectTransform dptRt = dpTxtObj.GetComponent<RectTransform>();
+            dptRt.anchorMin = Vector2.zero;
+            dptRt.anchorMax = Vector2.one;
+            dptRt.offsetMin = new Vector2(10f, 8f);
+            dptRt.offsetMax = new Vector2(-10f, -8f);
+            TextMeshProUGUI dpTxt = dpTxtObj.AddComponent<TextMeshProUGUI>();
+            dpTxt.fontSize = 24;
+            dpTxt.fontStyle = FontStyles.Bold;
+            dpTxt.alignment = TextAlignmentOptions.Center;
+            dpTxt.color = Color.white;
+            ui.cgDamagePopup = dmgPopupObj;
+            ui.cgDamageText = dpTxt;
+            dmgPopupObj.SetActive(false);
+
+            // Acting Enemy Holder (Right side of screen, 590, 0)
+            GameObject actingEnemyHolder = new GameObject("CGActingEnemyHolder", typeof(RectTransform));
+            actingEnemyHolder.transform.SetParent(cgRoot.transform, false);
+            RectTransform aeRt = actingEnemyHolder.GetComponent<RectTransform>();
+            aeRt.anchorMin = new Vector2(0.5f, 0.5f);
+            aeRt.anchorMax = new Vector2(0.5f, 0.5f);
+            aeRt.pivot = new Vector2(0.5f, 0.5f);
+            aeRt.anchoredPosition = new Vector2(590f, 0f);
+            aeRt.sizeDelta = new Vector2(480f, 820f);
+            ui.cgActingEnemyHolder = aeRt;
+
+            // Fullscreen click-to-dismiss button
+            GameObject btnClick = new GameObject("CGDismissBtn", typeof(RectTransform));
+            btnClick.transform.SetParent(cgRoot.transform, false);
+            RectTransform bcRt = btnClick.GetComponent<RectTransform>();
+            bcRt.anchorMin = Vector2.zero;
+            bcRt.anchorMax = Vector2.one;
+            bcRt.sizeDelta = Vector2.zero;
+            Image bcImg = btnClick.AddComponent<Image>();
+            bcImg.color = Color.clear;
+            Button bcBtn = btnClick.AddComponent<Button>();
+            bcBtn.targetGraphic = bcImg;
+            bcBtn.onClick.AddListener(() => { ui.cgSkipRequested = true; });
+            ui.cgDismissButton = bcBtn;
+
+            cgRoot.SetActive(false);
+            ui.cgOverlayRoot = cgRoot;
+
             ui.BindManager(manager);
             panelObj.SetActive(false);
             return ui;
+        }
+
+        private static void SetStatRowSize(TextMeshProUGUI valTxt, float valWidth, float totalRowWidth)
+        {
+            if (valTxt == null) return;
+            RectTransform valRt = valTxt.GetComponent<RectTransform>();
+            if (valRt != null) valRt.sizeDelta = new Vector2(valWidth, 40f);
+            if (valTxt.transform.parent != null)
+            {
+                RectTransform rowRt = valTxt.transform.parent.GetComponent<RectTransform>();
+                if (rowRt != null) rowRt.sizeDelta = new Vector2(totalRowWidth, 40f);
+            }
         }
 
         private static Button CreateModalButton(Transform parent, string name, Color color, out TextMeshProUGUI txt)
@@ -4179,6 +4856,72 @@ namespace UnbridledSanctum.UI
 #endif
         }
 
+        public void EnsureCombatLogScrollbar()
+        {
+            if (combatLogScrollRect == null) return;
+            if (combatLogScrollRect.verticalScrollbar != null) return;
+
+            // Viewport padding for scrollbar and transparent raycast target for mouse-wheel support
+            Transform vpTrans = combatLogScrollRect.viewport != null ? combatLogScrollRect.viewport.transform : combatLogScrollRect.transform.Find("Viewport");
+            if (vpTrans != null)
+            {
+                RectTransform vpr = vpTrans.GetComponent<RectTransform>();
+                if (vpr != null)
+                {
+                    vpr.offsetMax = new Vector2(-14f, 0f);
+                }
+                Image vpImg = vpTrans.GetComponent<Image>();
+                if (vpImg == null) vpImg = vpTrans.gameObject.AddComponent<Image>();
+                vpImg.color = Color.clear;
+                vpImg.raycastTarget = true;
+            }
+
+            // Scrollbar Track
+            GameObject sbObj = new GameObject("ScrollbarVertical", typeof(RectTransform));
+            sbObj.transform.SetParent(combatLogScrollRect.transform, false);
+            RectTransform sbrt = sbObj.GetComponent<RectTransform>();
+            sbrt.anchorMin = new Vector2(1f, 0f);
+            sbrt.anchorMax = new Vector2(1f, 1f);
+            sbrt.pivot = new Vector2(1f, 0.5f);
+            sbrt.anchoredPosition = Vector2.zero;
+            sbrt.sizeDelta = new Vector2(10f, 0f);
+
+            Image sbTrack = sbObj.AddComponent<Image>();
+            sbTrack.color = new Color(0.10f, 0.12f, 0.16f, 0.65f);
+
+            // Sliding Area & Handle
+            GameObject saObj = new GameObject("SlidingArea", typeof(RectTransform));
+            saObj.transform.SetParent(sbObj.transform, false);
+            RectTransform saRt = saObj.GetComponent<RectTransform>();
+            saRt.anchorMin = Vector2.zero;
+            saRt.anchorMax = Vector2.one;
+            saRt.sizeDelta = Vector2.zero;
+
+            GameObject handleObj = new GameObject("Handle", typeof(RectTransform));
+            handleObj.transform.SetParent(saObj.transform, false);
+            RectTransform hRt = handleObj.GetComponent<RectTransform>();
+            hRt.sizeDelta = Vector2.zero;
+
+            Image hImg = handleObj.AddComponent<Image>();
+            hImg.color = new Color(0.40f, 0.45f, 0.55f, 0.85f);
+
+            Scrollbar sb = sbObj.AddComponent<Scrollbar>();
+            sb.handleRect = hRt;
+            sb.targetGraphic = hImg;
+            sb.direction = Scrollbar.Direction.BottomToTop;
+
+            ColorBlock scb = sb.colors;
+            scb.normalColor = new Color(0.40f, 0.45f, 0.55f, 0.85f);
+            scb.highlightedColor = new Color(0.70f, 0.75f, 0.90f, 1f);
+            scb.pressedColor = new Color(0.30f, 0.35f, 0.45f, 1f);
+            scb.fadeDuration = 0.08f;
+            sb.colors = scb;
+
+            combatLogScrollRect.verticalScrollbar = sb;
+            combatLogScrollRect.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.Permanent;
+            combatLogScrollRect.scrollSensitivity = 25f;
+        }
+
         private static Sprite LoadSpriteFromPath(string relativePath)
         {
 #if UNITY_EDITOR
@@ -4190,6 +4933,174 @@ namespace UnbridledSanctum.UI
 #else
             return null;
 #endif
+        }
+
+        public static Sprite LoadCGSprite(string relativeOrResourcePath)
+        {
+            if (string.IsNullOrEmpty(relativeOrResourcePath)) return null;
+
+            // 1. Try Resources.Load
+            Sprite s = Resources.Load<Sprite>(relativeOrResourcePath);
+            if (s != null) return s;
+
+            string cleanPath = relativeOrResourcePath.Replace('\\', '/');
+
+            // 2. Try AssetDatabase in editor
+            s = LoadSpriteFromPath(cleanPath.StartsWith("Assets/") ? cleanPath : "Assets/" + cleanPath);
+            if (s != null) return s;
+            if (!cleanPath.EndsWith(".png"))
+            {
+                s = LoadSpriteFromPath((cleanPath.StartsWith("Assets/") ? cleanPath : "Assets/" + cleanPath) + ".png");
+                if (s != null) return s;
+            }
+
+            // 3. Fallback: file system direct Texture2D load
+            string diskPath = cleanPath;
+            if (!System.IO.Path.IsPathRooted(diskPath))
+            {
+                diskPath = System.IO.Path.Combine(Application.dataPath, diskPath.StartsWith("Assets/") ? diskPath.Substring(7) : diskPath);
+            }
+            if (!diskPath.EndsWith(".png") && !System.IO.File.Exists(diskPath))
+            {
+                diskPath += ".png";
+            }
+            if (System.IO.File.Exists(diskPath))
+            {
+                byte[] bytes = System.IO.File.ReadAllBytes(diskPath);
+                Texture2D tex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+                if (tex.LoadImage(bytes))
+                {
+                    return Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f));
+                }
+            }
+            return null;
+        }
+
+        public void EnsureCGOverlaySetup()
+        {
+            if (cgOverlayRoot == null) return;
+
+            // 1. Ensure Dimmer
+            Transform dimTrans = cgOverlayRoot.transform.Find("Dimmer");
+            if (dimTrans != null)
+            {
+                Image dimImg = dimTrans.GetComponent<Image>();
+                if (dimImg != null) dimImg.color = new Color(0.02f, 0.02f, 0.04f, 0.88f);
+            }
+
+            // 2. Ensure CGSquareBox (512x512 centered)
+            Transform sqTrans = cgOverlayRoot.transform.Find("CGSquareBox");
+            if (sqTrans == null)
+            {
+                Transform oldAb = cgOverlayRoot.transform.Find("CGAspectBox");
+                if (oldAb != null)
+                {
+                    oldAb.name = "CGSquareBox";
+                    sqTrans = oldAb;
+                    AspectRatioFitter arf = sqTrans.GetComponent<AspectRatioFitter>();
+                    if (arf != null) Destroy(arf);
+                }
+                else
+                {
+                    GameObject sqObj = new GameObject("CGSquareBox", typeof(RectTransform));
+                    sqObj.transform.SetParent(cgOverlayRoot.transform, false);
+                    sqTrans = sqObj.transform;
+                }
+            }
+
+            RectTransform sqRt = sqTrans.GetComponent<RectTransform>();
+            sqRt.anchorMin = new Vector2(0.5f, 0.5f);
+            sqRt.anchorMax = new Vector2(0.5f, 0.5f);
+            sqRt.pivot = new Vector2(0.5f, 0.5f);
+            sqRt.anchoredPosition = Vector2.zero;
+            sqRt.sizeDelta = new Vector2(512f, 512f);
+            cgSquareBox = sqRt;
+
+            Image sqBg = sqTrans.GetComponent<Image>();
+            if (sqBg == null) sqBg = sqTrans.gameObject.AddComponent<Image>();
+            sqBg.color = new Color(0.08f, 0.10f, 0.14f, 1f);
+
+            Outline sqOl = sqTrans.GetComponent<Outline>();
+            if (sqOl == null) sqOl = sqTrans.gameObject.AddComponent<Outline>();
+            sqOl.effectColor = new Color(0.85f, 0.70f, 0.35f, 0.85f);
+            sqOl.effectDistance = new Vector2(2f, -2f);
+
+            // 3. Ensure CGImage inside CGSquareBox
+            Transform artTrans = sqTrans.Find("CGImage");
+            if (artTrans == null)
+            {
+                GameObject artObj = new GameObject("CGImage", typeof(RectTransform));
+                artObj.transform.SetParent(sqTrans, false);
+                artTrans = artObj.transform;
+            }
+            RectTransform artRt = artTrans.GetComponent<RectTransform>();
+            artRt.anchorMin = Vector2.zero;
+            artRt.anchorMax = Vector2.one;
+            artRt.offsetMin = new Vector2(2f, 2f);
+            artRt.offsetMax = new Vector2(-2f, -2f);
+            Image artImg = artTrans.GetComponent<Image>();
+            if (artImg == null) artImg = artTrans.gameObject.AddComponent<Image>();
+            artImg.preserveAspect = true;
+            cgArtImage = artImg;
+
+            // 4. Ensure CGActingEnemyHolder on right (520, 0)
+            Transform aeTrans = cgOverlayRoot.transform.Find("CGActingEnemyHolder");
+            if (aeTrans == null)
+            {
+                GameObject aeObj = new GameObject("CGActingEnemyHolder", typeof(RectTransform));
+                aeObj.transform.SetParent(cgOverlayRoot.transform, false);
+                aeTrans = aeObj.transform;
+            }
+            RectTransform aeRt = aeTrans.GetComponent<RectTransform>();
+            aeRt.anchorMin = new Vector2(0.5f, 0.5f);
+            aeRt.anchorMax = new Vector2(0.5f, 0.5f);
+            aeRt.pivot = new Vector2(0.5f, 0.5f);
+            aeRt.anchoredPosition = new Vector2(590f, 0f);
+            aeRt.sizeDelta = new Vector2(480f, 820f);
+            cgActingEnemyHolder = aeRt;
+
+            // 5. Ensure CGDamagePopup (top-left of CGSquareBox)
+            Transform dpTrans = sqTrans.Find("CGDamagePopup");
+            if (dpTrans == null)
+            {
+                GameObject dpObj = new GameObject("CGDamagePopup", typeof(RectTransform));
+                dpObj.transform.SetParent(sqTrans, false);
+                dpTrans = dpObj.transform;
+
+                Image dpBg = dpObj.AddComponent<Image>();
+                dpBg.color = new Color(0.08f, 0.05f, 0.10f, 0.92f);
+                Outline dpOl = dpObj.AddComponent<Outline>();
+                dpOl.effectColor = new Color(1f, 0.35f, 0.65f, 0.95f);
+                dpOl.effectDistance = new Vector2(2f, -2f);
+
+                GameObject txtObj = new GameObject("Text", typeof(RectTransform));
+                txtObj.transform.SetParent(dpObj.transform, false);
+                RectTransform txtRt = txtObj.GetComponent<RectTransform>();
+                txtRt.anchorMin = Vector2.zero;
+                txtRt.anchorMax = Vector2.one;
+                txtRt.offsetMin = new Vector2(10f, 8f);
+                txtRt.offsetMax = new Vector2(-10f, -8f);
+
+                TextMeshProUGUI txt = txtObj.AddComponent<TextMeshProUGUI>();
+                txt.fontSize = 24;
+                txt.fontStyle = FontStyles.Bold;
+                txt.alignment = TextAlignmentOptions.Center;
+                txt.color = Color.white;
+            }
+
+            RectTransform dpRt = dpTrans.GetComponent<RectTransform>();
+            dpRt.anchorMin = new Vector2(0f, 1f);
+            dpRt.anchorMax = new Vector2(0f, 1f);
+            dpRt.pivot = new Vector2(1f, 0f);
+            dpRt.anchoredPosition = new Vector2(-20f, 20f);
+            dpRt.sizeDelta = new Vector2(280f, 90f);
+            cgDamagePopup = dpTrans.gameObject;
+            cgDamageText = dpTrans.GetComponentInChildren<TextMeshProUGUI>();
+            cgDamagePopup.SetActive(false);
+
+            // 6. Hide old full-screen CaptionBox if present
+            Transform capBox = cgOverlayRoot.transform.Find("CaptionBox");
+            if (capBox != null) capBox.gameObject.SetActive(false);
         }
     }
 }

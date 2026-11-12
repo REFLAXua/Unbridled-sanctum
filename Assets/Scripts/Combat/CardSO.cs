@@ -33,6 +33,7 @@ namespace UnbridledSanctum.Combat
         public CardTarget target = CardTarget.SingleEnemy;
 
         [Header("Struggle & Desire (GDD v1.5)")]
+        public CardStanceCategory stanceCategory = CardStanceCategory.Neutral;
         public CardCategory category = CardCategory.WarriorTactics;
         public LustPathType requiredPath = LustPathType.None;
         public StanceRequirement stanceRequirement = StanceRequirement.Any;
@@ -75,6 +76,7 @@ namespace UnbridledSanctum.Combat
             );
             card.clothesRepair = clothesRepair;
             card.cardArt = cardArt;
+            card.stanceCategory = stanceCategory;
             return card;
         }
     }

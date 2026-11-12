@@ -758,8 +758,18 @@ public class PaperDollController : MonoBehaviour
         if (characterState == null) return;
 
         // Legacy hair layers are cleared (hair is drawn directly on the canonical body sprite)
-        if (hairBackImage != null) ClearImage(hairBackImage);
-        if (hairFrontImage != null) ClearImage(hairFrontImage);
+        if (hairBackImage != null)
+        {
+            ClearImage(hairBackImage);
+            hairBackImage.enabled = false;
+            hairBackImage.gameObject.SetActive(false);
+        }
+        if (hairFrontImage != null)
+        {
+            ClearImage(hairFrontImage);
+            hairFrontImage.enabled = false;
+            hairFrontImage.gameObject.SetActive(false);
+        }
 
         // Expression (Natural art color, no shader tinting needed)
         if (expressionImage != null)

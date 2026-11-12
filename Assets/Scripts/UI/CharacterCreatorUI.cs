@@ -411,19 +411,37 @@ public class CharacterCreatorUI : MonoBehaviour
 
     private void UpdateHairFrontLabel()
     {
-        if (hairFrontLabel != null && database != null && database.hairFrontStyles.Count > 0)
+        if (hairFrontLabel != null)
         {
-            Sprite s = database.hairFrontStyles[currentHairFrontIdx];
-            hairFrontLabel.text = s != null ? s.name : "None";
+            if (database != null && database.hairFrontStyles.Count > 0)
+            {
+                Sprite s = database.hairFrontStyles[currentHairFrontIdx];
+                hairFrontLabel.text = s != null ? s.name : "None";
+            }
+            else
+            {
+                hairFrontLabel.text = "Fixed";
+                if (hairFrontPrevBtn != null) hairFrontPrevBtn.interactable = false;
+                if (hairFrontNextBtn != null) hairFrontNextBtn.interactable = false;
+            }
         }
     }
 
     private void UpdateHairBackLabel()
     {
-        if (hairBackLabel != null && database != null && database.hairBackStyles.Count > 0)
+        if (hairBackLabel != null)
         {
-            Sprite s = database.hairBackStyles[currentHairBackIdx];
-            hairBackLabel.text = s != null ? s.name : "None";
+            if (database != null && database.hairBackStyles.Count > 0)
+            {
+                Sprite s = database.hairBackStyles[currentHairBackIdx];
+                hairBackLabel.text = s != null ? s.name : "None";
+            }
+            else
+            {
+                hairBackLabel.text = "Fixed";
+                if (hairBackPrevBtn != null) hairBackPrevBtn.interactable = false;
+                if (hairBackNextBtn != null) hairBackNextBtn.interactable = false;
+            }
         }
     }
 

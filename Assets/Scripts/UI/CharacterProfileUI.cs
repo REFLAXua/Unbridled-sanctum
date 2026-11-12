@@ -518,13 +518,15 @@ public class CharacterProfileUI : MonoBehaviour
             ItemData l = characterState.GetEquippedItem(EquipSlot.LowerClothes);
             ItemData uu = characterState.GetEquippedItem(EquipSlot.UnderUpper);
             ItemData ul = characterState.GetEquippedItem(EquipSlot.UnderLower);
+            ItemData w = characterState.GetEquippedItem(EquipSlot.Weapon);
 
             string uStr = u != null ? $"<color=#66CCFF>{u.itemName}</color>" : "<color=#8899AA>None</color>";
             string lStr = l != null ? $"<color=#66CCFF>{l.itemName}</color>" : "<color=#8899AA>None</color>";
             string uuStr = uu != null ? $"<color=#AA88FF>{uu.itemName}</color>" : "<color=#8899AA>None</color>";
             string ulStr = ul != null ? $"<color=#AA88FF>{ul.itemName}</color>" : "<color=#8899AA>None</color>";
+            string wStr = w != null ? $"<color=#FFCC44>{w.itemName}</color>" : "<color=#8899AA>Unarmed</color>";
 
-            equippedSummaryText.text = $"<b>Equipped:</b> Top: {uStr} | Bottom: {lStr} | Bra: {uuStr} | Panties: {ulStr}";
+            equippedSummaryText.text = $"<b>Equipped:</b> Top: {uStr} | Bot: {lStr} | Bra: {uuStr} | Panties: {ulStr} | Weapon: {wStr}";
         }
 
         if (inventoryManager != null)
@@ -670,15 +672,7 @@ public class CharacterProfileUI : MonoBehaviour
     private bool IsItemEquipped(ItemData item)
     {
         if (characterState == null || item == null) return false;
-        ItemData u = characterState.GetEquippedItem(EquipSlot.UpperClothes);
-        if (u == item) return true;
-        ItemData l = characterState.GetEquippedItem(EquipSlot.LowerClothes);
-        if (l == item) return true;
-        ItemData uu = characterState.GetEquippedItem(EquipSlot.UnderUpper);
-        if (uu == item) return true;
-        ItemData ul = characterState.GetEquippedItem(EquipSlot.UnderLower);
-        if (ul == item) return true;
-        return false;
+        return characterState.IsEquipped(item);
     }
 
     private void RefreshDetailCard()
@@ -697,7 +691,26 @@ public class CharacterProfileUI : MonoBehaviour
         if (detailItemName != null) detailItemName.text = $"<color=#FFE4A0><b>{selectedItem.itemName}</b></color>";
         if (detailItemStats != null)
         {
-            detailItemStats.text = $"Slot: <color=#66CCFF>{selectedItem.equipSlot}</color> | Durability: <color=#44FF88>{selectedItem.durability} HP</color> | Armor: <color=#FFDD44>+{selectedItem.damageReduction}</color>";
+            if (selectedItem.equipSlot == EquipSlot.Weapon)
+            {
+                string skillName = !string.IsNullOrEmpty(selectedItem.grantedCardId) ? selectedItem.grantedCardId : "None";
+                if (CombatManager.Instance != null)
+                {
+                    var cd = CombatManager.Instance.unlockedCards.Find(c => c.id == selectedItem.grantedCardId);
+                    if (cd != null) skillName = cd.cardName;
+                }
+                string bonus = "";
+                if (selectedItem.damageReduction > 0) bonus += $" | Armor: +{selectedItem.damageReduction}";
+                if (selectedItem.bonusSeductionPower > 0) bonus += $" | +{selectedItem.bonusSeductionPower}% Seduce";
+                if (selectedItem.seductionResistance > 0) bonus += $" | +{selectedItem.seductionResistance}% Lust Res";
+                if (selectedItem.bonusMaxHp > 0) bonus += $" | +{selectedItem.bonusMaxHp} HP";
+
+                detailItemStats.text = $"Slot: <color=#FFCC44>Weapon</color> | Innate Action: <color=#66FFCC>{skillName}</color> | Durability: <color=#44FF88>{selectedItem.durability} HP</color>{bonus}";
+            }
+            else
+            {
+                detailItemStats.text = $"Slot: <color=#66CCFF>{selectedItem.equipSlot}</color> | Durability: <color=#44FF88>{selectedItem.durability} HP</color> | Armor: <color=#FFDD44>+{selectedItem.damageReduction}</color>";
+            }
         }
         if (detailItemDesc != null) detailItemDesc.text = selectedItem.description;
 

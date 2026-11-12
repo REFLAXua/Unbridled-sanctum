@@ -73,15 +73,31 @@ public class CharacterState : MonoBehaviour
 
         bool changed = false;
 
-        if ((selectedHairFront == null || !appearanceDatabase.hairFrontStyles.Contains(selectedHairFront)) && appearanceDatabase.hairFrontStyles.Count > 0)
+        if (appearanceDatabase.hairFrontStyles.Count > 0)
         {
-            selectedHairFront = appearanceDatabase.hairFrontStyles[0];
+            if (selectedHairFront == null || !appearanceDatabase.hairFrontStyles.Contains(selectedHairFront))
+            {
+                selectedHairFront = appearanceDatabase.hairFrontStyles[0];
+                changed = true;
+            }
+        }
+        else if (selectedHairFront != null)
+        {
+            selectedHairFront = null;
             changed = true;
         }
 
-        if ((selectedHairBack == null || !appearanceDatabase.hairBackStyles.Contains(selectedHairBack)) && appearanceDatabase.hairBackStyles.Count > 0)
+        if (appearanceDatabase.hairBackStyles.Count > 0)
         {
-            selectedHairBack = appearanceDatabase.hairBackStyles[0];
+            if (selectedHairBack == null || !appearanceDatabase.hairBackStyles.Contains(selectedHairBack))
+            {
+                selectedHairBack = appearanceDatabase.hairBackStyles[0];
+                changed = true;
+            }
+        }
+        else if (selectedHairBack != null)
+        {
+            selectedHairBack = null;
             changed = true;
         }
 

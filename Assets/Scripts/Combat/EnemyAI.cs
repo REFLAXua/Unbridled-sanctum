@@ -355,15 +355,15 @@ namespace UnbridledSanctum.Combat
             armorTarget: ArmorTargetSlot.All, staminaDmg: 3, pranaGain: 0, stanceReq: CombatStance.Neutral
         );
 
-        private static readonly EnemySkill ScoutFacePin = new EnemySkill(
-            "Face Pin & Intoxicant Hold", manaCost: 2, hpDmg: 0, clothesDmg: 0, seductionDmg: 16, shieldGain: 0, manaGain: 0,
-            desc: "Darts in close and clamps both slender hands around your cheeks, pinning your head to the moss while whispering sweet elven promises!",
+        private static readonly EnemySkill ScoutNeckClinch = new EnemySkill(
+            "Neck Clinch Hold", manaCost: 2, hpDmg: 0, clothesDmg: 0, seductionDmg: 0, shieldGain: 0, manaGain: 0,
+            desc: "Darts in close and wraps both slender arms tightly around your neck, pulling your face close while trapping you in an intimate embrace!",
             armorTarget: ArmorTargetSlot.Upper, staminaDmg: 10, pranaGain: 0, stanceReq: CombatStance.Neutral,
             transitionTo: CombatStance.Grappled, targetSlot: PenetrationSlot.None, targetGrapple: GrappleZone.Upper
         );
 
         private static readonly EnemySkill ScoutThighPin = new EnemySkill(
-            "Thigh Pin & Leg Spread", manaCost: 2, hpDmg: 0, clothesDmg: 8, seductionDmg: 14, shieldGain: 0, manaGain: 0,
+            "Thigh Pin & Leg Spread", manaCost: 2, hpDmg: 0, clothesDmg: 8, seductionDmg: 0, shieldGain: 0, manaGain: 0,
             desc: "Scissor-locks her athletic bare thighs firmly around your hips, forcing your knees apart to leave your feminine cleft vulnerable!",
             armorTarget: ArmorTargetSlot.Lower, staminaDmg: 12, pranaGain: 0, stanceReq: CombatStance.Neutral,
             transitionTo: CombatStance.Grappled, targetSlot: PenetrationSlot.None, targetGrapple: GrappleZone.Lower
@@ -386,14 +386,14 @@ namespace UnbridledSanctum.Combat
             "Aphrodisiac Kiss", manaCost: 2, hpDmg: 0, clothesDmg: 0, seductionDmg: 28, shieldGain: 0, manaGain: 0,
             desc: "Pins your cheeks with slender hands and captures your lips in a passionate, intoxicating elven kiss, sharing heady nectar!",
             armorTarget: ArmorTargetSlot.Upper, staminaDmg: 8, pranaGain: 0, stanceReq: CombatStance.Grappled,
-            transitionTo: CombatStance.Penetrated, targetSlot: PenetrationSlot.Mouth
+            transitionTo: CombatStance.Penetrated, targetSlot: PenetrationSlot.Mouth, targetGrapple: GrappleZone.Upper
         );
 
         private static readonly EnemySkill ScoutFingerPlay = new EnemySkill(
             "Manual Incursion (Fingers)", manaCost: 2, hpDmg: 0, clothesDmg: 0, seductionDmg: 32, shieldGain: 0, manaGain: 0,
             desc: "Reaches between your exposed thighs, deftly parting your soaked petal folds to slide her agile elven fingers inside!",
             armorTarget: ArmorTargetSlot.Lower, staminaDmg: 8, pranaGain: 0, stanceReq: CombatStance.Grappled,
-            transitionTo: CombatStance.Penetrated, targetSlot: PenetrationSlot.Vagina
+            transitionTo: CombatStance.Penetrated, targetSlot: PenetrationSlot.Vagina, targetGrapple: GrappleZone.Lower
         );
 
         // --- Elven Scout: Penetrated Stance (Dedicated single move per orifice) ---
@@ -401,14 +401,14 @@ namespace UnbridledSanctum.Combat
             "Nectar Influx Kiss", manaCost: 0, hpDmg: 0, clothesDmg: 0, seductionDmg: 28, shieldGain: 0, manaGain: 5,
             desc: "Her tongue swirls deeply against yours, parting your lips to let warm, aphrodisiac-laced saliva trickle down your throat.",
             armorTarget: ArmorTargetSlot.All, staminaDmg: 6, pranaGain: 0, stanceReq: CombatStance.Penetrated,
-            transitionTo: null, selfArousal: 18, targetSlot: PenetrationSlot.Mouth
+            transitionTo: null, selfArousal: 18, targetSlot: PenetrationSlot.Mouth, targetGrapple: GrappleZone.Upper
         );
 
         private static readonly EnemySkill ScoutVaginalFingers = new EnemySkill(
             "Vaginal Finger Penetration", manaCost: 0, hpDmg: 0, clothesDmg: 0, seductionDmg: 34, shieldGain: 0, manaGain: 5,
             desc: "Curves her agile elven fingers deep within your damp vessel, stroking with slick rhythmic speed that drives your hips into convulsive trembling.",
             armorTarget: ArmorTargetSlot.All, staminaDmg: 8, pranaGain: 0, stanceReq: CombatStance.Penetrated,
-            transitionTo: null, selfArousal: 20, targetSlot: PenetrationSlot.Vagina
+            transitionTo: null, selfArousal: 20, targetSlot: PenetrationSlot.Vagina, targetGrapple: GrappleZone.Lower
         );
 
 
@@ -558,7 +558,7 @@ namespace UnbridledSanctum.Combat
             else
             {
                 // Player completely naked! Slime attempts grapple pounce, engulf, or fap to face
-                if (UnityEngine.Random.value < 0.45f)
+                if (canGrapple && UnityEngine.Random.value < 0.45f)
                 {
                     return SlimeAdhesivePounce;
                 }
@@ -837,30 +837,53 @@ namespace UnbridledSanctum.Combat
             bool canLowerGrapple = cm == null || cm.CanGrapple(enemy, GrappleZone.Lower);
             bool canUpperGrapple = cm == null || cm.CanGrapple(enemy, GrappleZone.Upper);
 
-            // Cascade 1 (Thigh Pin -> Vaginal Track): Prioritized if player's stamina is low or lower garments torn
+            // 1. Dynamic context weights for available grapple zones
+            float weightLower = canLowerGrapple ? 1.0f : 0f;
+            float weightUpper = canUpperGrapple ? 1.0f : 0f;
+
+            // Prioritize Lower if player is exhausted or outer lower armor torn
             if (canLowerGrapple && (player.currentStamina <= 10 || player.isOuterLowerTorn))
             {
-                if (UnityEngine.Random.value < 0.65f) return ScoutThighPin;
+                weightLower += 1.5f;
             }
 
-            // Cascade 2 (Face Pin -> Oral Track): Prioritized if player has high arousal
+            // Prioritize Upper if player is aroused
             if (canUpperGrapple && (player.seduction >= 25 || player.seductionStacks >= 1))
             {
-                if (UnityEngine.Random.value < 0.50f) return ScoutFacePin;
+                weightUpper += 1.5f;
             }
 
-            // Opportunistic thigh pin if lower zone is free
-            if (canLowerGrapple && UnityEngine.Random.value < 0.35f)
+            bool anyGrappleAvailable = (weightLower > 0f || weightUpper > 0f);
+
+            // 2. High urgency grapple trigger (when explicit conditions are met)
+            bool highUrgencyLower = canLowerGrapple && (player.currentStamina <= 10 || player.isOuterLowerTorn);
+            bool highUrgencyUpper = canUpperGrapple && (player.seduction >= 35 || player.seductionStacks >= 1);
+
+            if ((highUrgencyLower || highUrgencyUpper) && anyGrappleAvailable)
             {
-                return ScoutThighPin;
+                if (UnityEngine.Random.value < 0.65f)
+                {
+                    float totalWeight = weightLower + weightUpper;
+                    float pick = UnityEngine.Random.value * totalWeight;
+                    return (pick < weightLower) ? ScoutThighPin : ScoutNeckClinch;
+                }
             }
 
-            // High arousal tease
-            if (player.seductionStacks >= 1 && UnityEngine.Random.value < 0.40f)
+            // 3. Opportunistic grapple attempt (balanced 50/50 baseline when both zones are free)
+            if (anyGrappleAvailable && UnityEngine.Random.value < 0.40f)
+            {
+                float totalWeight = weightLower + weightUpper;
+                float pick = UnityEngine.Random.value * totalWeight;
+                return (pick < weightLower) ? ScoutThighPin : ScoutNeckClinch;
+            }
+
+            // 4. Seductive teasing if player is slightly aroused
+            if (player.seductionStacks >= 1 && UnityEngine.Random.value < 0.35f)
             {
                 return ScoutSeductiveTease;
             }
 
+            // 5. Ranged tactical actions
             float roll = UnityEngine.Random.value;
             if (enemy.currentMana >= ScoutPheromoneGrenade.manaCost && roll < 0.35f)
             {
@@ -877,7 +900,7 @@ namespace UnbridledSanctum.Combat
         {
             var cm = CombatManager.Instance;
 
-            // --- TRACK 1: Face Pin -> Dedicated cascade into Oral Penetration (Mouth) ---
+            // --- TRACK 1: Neck Clinch -> Dedicated cascade into Oral Penetration (Mouth) ---
             if (enemy.heldGrappleZone == GrappleZone.Upper)
             {
                 bool canOral = cm != null ? cm.CanPenetrateSlot(enemy, PenetrationSlot.Mouth) : true;

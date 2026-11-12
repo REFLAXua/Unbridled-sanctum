@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using System;
 using System.Collections.Generic;
 
@@ -23,10 +23,33 @@ public class InventoryManager : MonoBehaviour
     {
         foreach (var item in startingItems)
         {
-            if (item != null)
+            if (item != null && !items.Contains(item))
                 items.Add(item);
         }
+
+        // Auto-seed starter weapons if not present
+        EnsureDefaultStarterEquipment();
+
         OnInventoryChanged?.Invoke();
+    }
+
+    private void EnsureDefaultStarterEquipment()
+    {
+        bool hasWeapon = items.Exists(i => i != null && i.equipSlot == EquipSlot.Weapon);
+        if (!hasWeapon)
+        {
+            var weaponAssets = Resources.LoadAll<ItemData>("Items/Weapons");
+            if (weaponAssets != null && weaponAssets.Length > 0)
+            {
+                foreach (var w in weaponAssets)
+                {
+                    if (w != null && !items.Contains(w))
+                    {
+                        items.Add(w);
+                    }
+                }
+            }
+        }
     }
 
     public void AddItem(ItemData item)
